@@ -47,22 +47,30 @@ export function PageShell({
       <div className="grid">
         <div className="card">
           <ArcGauge
-            labelTop={item.primaryLabelTop}
-            labelBottom={`${formatValue(item.primaryCurrent)} / ${formatValue(item.primaryTarget)}`}
-            subLabel={item.primaryLabelBottom}
-            value={item.primaryCurrent}
-            max={item.primaryTarget}
-          />
+              value={item.primaryCurrent}
+              max={item.primaryTarget}
+              labelTop={item.primaryLabelTop}
+              centerMainParts={{
+                top: `${fmt(item.primaryCurrent)}`,
+                bottom: `${fmt(item.primaryTarget)}`
+              }}
+              centerSub={`${fmt(item.primaryTarget - item.primaryCurrent)} XP Left`}
+              centerHint={item.milestoneUnit === "kills" ? "To next milestone" : "To next level"}
+            />
         </div>
 
         <div className="card">
           {item.secondaryType === "gauge" ? (
             <ArcGauge
-              labelTop={item.secondaryLabelTop}
-              labelBottom={`${formatValue(item.secondaryCurrent ?? 0)} / ${formatValue(item.secondaryTarget ?? 1)}`}
-              subLabel={item.secondaryLabelBottom ?? ""}
-              value={item.secondaryCurrent ?? 0}
-              max={item.secondaryTarget ?? 1}
+              value={item.primaryCurrent}
+              max={item.primaryTarget}
+              labelTop={item.primaryLabelTop}
+              centerMainParts={{
+                top: `${fmt(item.secondaryCurrent ?? 0)}`,
+                bottom: `${fmt(item.secondaryTarget ?? 1)}`
+              }}
+              centerSub={`${fmt(item.primaryTarget - item.primaryCurrent)} XP Left`}
+              centerHint="To 99"
             />
           ) : (
             <RankBadge labelTop={item.secondaryLabelTop} valueText={item.secondaryLabelBottom ?? ""} />
@@ -93,7 +101,6 @@ export function PageShell({
   );
 }
 
-function formatValue(n: number) {
-  // You can refine this later (xp formatting like 1.5m etc)
-  return n.toLocaleString();
+function fmt(n: number) {
+  return Math.max(0, n).toLocaleString();
 }

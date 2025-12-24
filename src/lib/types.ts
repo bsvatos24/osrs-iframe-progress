@@ -23,4 +23,5 @@ export type DisplayItem = {
   milestones: number[];        // e.g. [70,80,90,99]
   milestoneCurrent: number;    // level or kills
   milestoneUnit: "level" | "kills";
+
 };
