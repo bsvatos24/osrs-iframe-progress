@@ -24,4 +24,5 @@ export type DisplayItem = {
   milestoneCurrent: number;    // level or kills
   milestoneUnit: "level" | "kills";
 
+  skillLevel?: number;
 };

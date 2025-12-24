@@ -37,21 +37,31 @@ export function PickerModal({ open, title, items, pinnedId, onClose, onSelect, o
           onChange={(e) => setQ(e.target.value)}
         />
 
-        <div className="list">
+        {/* GRID instead of rows */}
+        <div className="pickerGrid">
           {filtered.map((it) => {
             const pinned = pinnedId === it.id;
+
             return (
-              <div key={it.id} className="listRow">
-                <button className="listMain" onClick={() => onSelect(it.id)}>
-                  <img className="listIcon" src={it.iconUrl} alt="" />
-                  <span>{it.name}</span>
-                </button>
-                <button className={`btn ${pinned ? "btnPin" : ""}`} onClick={() => onPin(it.id)}>
-                  {pinned ? "Pinned" : "Pin"}
-                </button>
-              </div>
+              <button
+                key={it.id}
+                className={`pickerTile ${pinned ? "pickerTilePinned" : ""}`}
+                onClick={() => onSelect(it.id)}
+                title={it.name}
+              >
+                <img className="pickerTileIcon" src={it.iconUrl} alt="" />
+                <div className="pickerTileName">{it.name}</div>
+              </button>
             );
           })}
+        </div>
+
+        {/* Optional pin controls row (only if you still want pinning in modal) */}
+        {/* If you want pin on right-click instead, tell me and I’ll wire it. */}
+        <div style={{ display: "none" }}>
+          {filtered.map((it) => (
+            <button key={it.id} onClick={() => onPin(it.id)}>{it.name}</button>
+          ))}
         </div>
       </div>
     </div>

@@ -26,43 +26,50 @@ function slug(name: string) {
 
 export function mapHiscoresToDisplayItems(data: HiscoresResponse): DisplayItem[] {
   const skills: DisplayItem[] = data.skills
-    .filter(s => s.name !== "Overall") // optional: remove Overall from Skills carousel
-    .map(s => {
-      const currentLevel = s.level;
-      const currentXp = s.xp;
+  .filter(s => s.name !== "Overall")
+  .map(s => {
+    const currentLevel = s.level;
+    const currentXp = s.xp;
 
-      const curLevelXp = xpForLevel(currentLevel);
-      const nextLevelXp = xpForLevel(Math.min(126, currentLevel + 1));
+    const curLevelXp = xpForLevel(currentLevel);
+    const nextLevelXp = xpForLevel(Math.min(126, currentLevel + 1));
 
-      const inLevel = Math.max(0, currentXp - curLevelXp);
-      const needed = Math.max(1, nextLevelXp - curLevelXp);
+    const inLevel = Math.max(0, currentXp - curLevelXp);
+    const needed = Math.max(1, nextLevelXp - curLevelXp);
 
-      const pct = clamp((inLevel / needed) * 100, 0, 100);
+    const pctLevel = clamp((inLevel / needed) * 100, 0, 100);
 
-      const xp99 = xpForLevel(99);
+    const xp99 = xpForLevel(99);
+    const pctTo99 = clamp((currentXp / Math.max(1, xp99)) * 100, 0, 100);
 
-      return {
-        id: `skill-${s.id}`,
-        category: "skills",
-        name: s.name,
-        iconUrl: iconForSkill(s.name),
+    return {
+      id: `skill-${s.id}`,
+      category: "skills",
+      name: s.name,
+      iconUrl: iconForSkill(s.name),
 
-        primaryCurrent: inLevel,
-        primaryTarget: needed,
-        primaryLabelTop: `${pct.toFixed(0)}% Complete`,
-        primaryLabelBottom: `${formatCompact(inLevel)} / ${formatCompact(needed)}`,
+      // for header
+      skillLevel: currentLevel,
 
-        secondaryType: "gauge",
-        secondaryCurrent: currentXp,
-        secondaryTarget: xp99,
-        secondaryLabelTop: `Level ${currentLevel} / 99`,
-        secondaryLabelBottom: `${formatCompact(currentXp)} / ${formatCompact(xp99)} XP`,
+      // Primary arc: current XP within THIS level
+      primaryCurrent: inLevel,
+      primaryTarget: needed,
+      primaryLabelTop: `${pctLevel.toFixed(0)}% Complete`,
+      primaryLabelBottom: `${formatCompact(inLevel)} / ${formatCompact(needed)}`,
 
-        milestones: SKILL_MILESTONES,
-        milestoneCurrent: currentLevel,
-        milestoneUnit: "level"
-      };
-    });
+      // Secondary arc: progress to 99 (xp/xp99)
+      secondaryType: "gauge",
+      secondaryCurrent: currentXp,
+      secondaryTarget: xp99,
+      secondaryLabelTop: `${pctTo99.toFixed(0)}% to 99`, // ✅ change
+      secondaryLabelBottom: `${formatCompact(currentXp)} / ${formatCompact(xp99)} XP`,
+
+      milestones: SKILL_MILESTONES,
+      milestoneCurrent: currentLevel,
+      milestoneUnit: "level"
+    };
+  });
+
 
   const bosses: DisplayItem[] = [];
   const activities: DisplayItem[] = [];
