@@ -27,7 +27,7 @@ export function PickerModal({ open, title, items, pinnedId, onClose, onSelect, o
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modalHeader">
           <div className="modalTitle">{title}</div>
-          <button className="btn" onClick={onClose}>Close</button>
+          <button type="button" className="btn" onClick={onClose}>Close</button>
         </div>
 
         <input
@@ -44,6 +44,7 @@ export function PickerModal({ open, title, items, pinnedId, onClose, onSelect, o
 
             return (
               <button
+                type="button"
                 key={it.id}
                 className={`pickerTile ${pinned ? "pickerTilePinned" : ""}`}
                 onClick={() => onSelect(it.id)}
@@ -60,7 +61,7 @@ export function PickerModal({ open, title, items, pinnedId, onClose, onSelect, o
         {/* If you want pin on right-click instead, tell me and I’ll wire it. */}
         <div style={{ display: "none" }}>
           {filtered.map((it) => (
-            <button key={it.id} onClick={() => onPin(it.id)}>{it.name}</button>
+            <button type="button" key={it.id} onClick={() => onPin(it.id)}>{it.name}</button>
           ))}
         </div>
       </div>

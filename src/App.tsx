@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Category, DisplayItem } from "./lib/types";
 import { fetchHiscores } from "./lib/hiscoresApi";
 import { mapHiscoresToDisplayItems } from "./lib/mapToDisplayItems";
@@ -13,7 +13,10 @@ import "./styles.css";
 const DEFAULT_PLAYER = "BenjiFresh91";
 
 export default function App() {
+  // ✅ keep an input value separate from the "applied" player
+  const [playerInput, setPlayerInput] = useState(DEFAULT_PLAYER);
   const [player, setPlayer] = useState(DEFAULT_PLAYER);
+
   const [items, setItems] = useState<DisplayItem[]>([]);
   const [category, setCategory] = useState<Category>("skills");
   const [index, setIndex] = useState(0);
@@ -27,6 +30,12 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ used to force a refresh without changing player/category/index
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
+  // Track “current selection” by id so refresh can keep you on the same item
+  const lastSelectedIdRef = useRef<string | null>(null);
+
   const filtered = useMemo(
     () => items.filter((i) => i.category === category),
     [items, category]
@@ -34,74 +43,63 @@ export default function App() {
 
   const current = filtered[index] ?? null;
 
+  // Keep ref updated with currently shown item id
+  useEffect(() => {
+    lastSelectedIdRef.current = current?.id ?? null;
+  }, [current?.id]);
+
+  // ✅ Fetch only on:
+  // - initial mount
+  // - player changes via "Apply"
+  // - explicit refresh button click (refreshNonce change)
+  useEffect(() => {
+    const ac = new AbortController();
+
+    const isInitial = refreshNonce === 0 && player === DEFAULT_PLAYER && items.length === 0;
+    if (isInitial) setLoading(true);
+
+    setError(null);
+
+    fetchHiscores(player, ac.signal)
+      .then((data) => {
+        const mapped = mapHiscoresToDisplayItems(data);
+        setItems(mapped);
+
+        // ✅ after refresh, try to stay on same item (by id) inside the current category
+        const desiredId = pinnedId ?? lastSelectedIdRef.current;
+        if (desiredId) {
+          const nextFiltered = mapped.filter((i) => i.category === category);
+          const idx = nextFiltered.findIndex((x) => x.id === desiredId);
+          if (idx >= 0) setIndex(idx);
+          else setIndex(0);
+        } else {
+          // if not pinned and no prior selection, keep index but clamp
+          setIndex((prev) => {
+            const nextFiltered = mapped.filter((i) => i.category === category);
+            if (nextFiltered.length === 0) return 0;
+            return Math.min(prev, nextFiltered.length - 1);
+          });
+        }
+      })
+      .catch((e: unknown) => {
+        if ((e as any)?.name === "AbortError") return;
+        setError((e as Error).message ?? "Unknown error");
+      })
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
+
+    return () => ac.abort();
+    // ✅ IMPORTANT: index is NOT in deps, so auto-cycle cannot trigger a fetch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player, refreshNonce, category, pinnedId]);
+
   // Jump to item by id within current category
   function jumpToId(id: string) {
     const idx = filtered.findIndex((x) => x.id === id);
     if (idx >= 0) setIndex(idx);
   }
-
-  /**
-   * Load data helper:
-   * - if keepSelection = true, we keep category + current item (by id if possible)
-   * - never touches pinned / pinnedId
-   */
-  const loadData = useCallback(
-    async (opts?: { keepSelection?: boolean }) => {
-      const keepSelection = opts?.keepSelection ?? false;
-
-      const prevCategory = category;
-      const prevIndex = index;
-      const prevId = current?.id ?? null;
-
-      const ac = new AbortController();
-
-      setError(null);
-      if (keepSelection) setRefreshing(true);
-      else setLoading(true);
-
-      try {
-        const data = await fetchHiscores(player, ac.signal);
-        const mapped = mapHiscoresToDisplayItems(data);
-        setItems(mapped);
-
-        if (keepSelection) {
-          // rebuild filtered list for the same category
-          const nextFiltered = mapped.filter((i) => i.category === prevCategory);
-
-          let nextIndex = 0;
-
-          // prefer ID match if possible
-          if (prevId) {
-            const found = nextFiltered.findIndex((x) => x.id === prevId);
-            if (found >= 0) nextIndex = found;
-            else nextIndex = Math.min(prevIndex, Math.max(0, nextFiltered.length - 1));
-          } else {
-            nextIndex = Math.min(prevIndex, Math.max(0, nextFiltered.length - 1));
-          }
-
-          setCategory(prevCategory);
-          setIndex(nextIndex);
-        } else {
-          // initial load / player change: reset selection
-          setIndex(0);
-        }
-      } catch (e: unknown) {
-        if ((e as any)?.name === "AbortError") return;
-        setError((e as Error).message ?? "Unknown error");
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-
-      return () => ac.abort();
-    },
-    [player, category, index, current?.id]
-  );
-
-  // Initial fetch + when player changes (reset selection)
-  useEffect(() => {
-    loadData({ keepSelection: false });
-  }, [player, loadData]);
 
   // Auto cycle (only if not pinned and we have items)
   useEffect(() => {
@@ -115,33 +113,30 @@ export default function App() {
     return () => window.clearInterval(t);
   }, [pinned, pinnedId, filtered.length]);
 
-  // When category changes, just reset index (DO NOT reset pin states)
+  // Reset selection when category changes (but DO NOT refetch)
   useEffect(() => {
     setIndex(0);
+    // keep pinned state as-is unless you want category change to unpin
+    // (right now we keep it)
   }, [category]);
 
-  // If pinnedId is set, always keep us on it (within current category)
-  useEffect(() => {
-    if (!pinnedId) return;
-
-    const idx = filtered.findIndex((x) => x.id === pinnedId);
-    if (idx >= 0) {
-      setPinned(true);
-      setIndex(idx);
-    }
-  }, [pinnedId, filtered]);
+  function onApplyPlayer() {
+    const next = playerInput.trim();
+    if (!next) return;
+    setPlayer(next); // ✅ triggers fetch
+  }
 
   function onRefresh() {
-    // re-fetch, keep same selection + pinned status
-    loadData({ keepSelection: true });
+    setRefreshing(true);
+    setRefreshNonce((n) => n + 1); // ✅ triggers fetch, keeps state
   }
 
   return (
     <div className="app">
       <header className="header">
-        {/* top-right buttons */}
         <div className="headerActions">
           <button
+            type="button"
             className="iconBtn"
             onClick={onRefresh}
             aria-label="Refresh"
@@ -152,6 +147,7 @@ export default function App() {
           </button>
 
           <button
+            type="button"
             className="iconBtn"
             onClick={() => setPickerOpen(true)}
             aria-label="Pick item"
@@ -182,13 +178,10 @@ export default function App() {
                 : "No data"}
             </div>
           </div>
-
-          {error ? <div style={{ marginTop: 6, color: "rgba(255,255,255,0.75)" }}>{error}</div> : null}
         </div>
       </header>
 
       <main className="grid">
-        {/* LEFT ARC */}
         <section className="card cardArc">
           {loading ? (
             <div>Loading…</div>
@@ -211,7 +204,6 @@ export default function App() {
           )}
         </section>
 
-        {/* RIGHT ARC OR RANK */}
         <section className="card cardArc">
           {loading ? (
             <div>Loading…</div>
@@ -241,7 +233,6 @@ export default function App() {
           )}
         </section>
 
-        {/* MILESTONES */}
         <section className="card full">
           {current ? (
             <MilestoneBar
@@ -257,18 +248,21 @@ export default function App() {
       <footer className="footer">
         <div className="tabs">
           <button
+            type="button"
             className={`tab ${category === "skills" ? "tabActive" : ""}`}
             onClick={() => setCategory("skills")}
           >
             Skills
           </button>
           <button
+            type="button"
             className={`tab ${category === "bosses" ? "tabActive" : ""}`}
             onClick={() => setCategory("bosses")}
           >
             Bosses
           </button>
           <button
+            type="button"
             className={`tab ${category === "activities" ? "tabActive" : ""}`}
             onClick={() => setCategory("activities")}
           >
@@ -278,25 +272,21 @@ export default function App() {
 
         <div className="controls">
           <button
+            type="button"
             className={`btn ${pinned || pinnedId ? "btnPin" : ""}`}
             onClick={() => {
-              // Toggle manual pin; if pinning manually, clear pinnedId
               setPinned((p) => {
                 const next = !p;
                 if (next) setPinnedId(null);
                 return next;
               });
-
-              // If unpinning manually, also clear pinnedId (so cycling can resume)
-              if (pinned || pinnedId) {
-                setPinnedId(null);
-              }
             }}
           >
             {pinned || pinnedId ? "Pinned" : "Pin"}
           </button>
 
           <button
+            type="button"
             className="btn"
             onClick={() => setIndex((i) => Math.max(0, i - 1))}
             disabled={filtered.length === 0}
@@ -305,6 +295,7 @@ export default function App() {
           </button>
 
           <button
+            type="button"
             className="btn"
             onClick={() => setIndex((i) => (filtered.length ? (i + 1) % filtered.length : 0))}
             disabled={filtered.length === 0}
@@ -315,14 +306,20 @@ export default function App() {
           <input
             className="input"
             style={{ width: 180 }}
-            value={player}
-            onChange={(e) => setPlayer(e.target.value)}
+            value={playerInput}
+            onChange={(e) => setPlayerInput(e.target.value)}
             placeholder="Player name"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onApplyPlayer();
+            }}
           />
+
+          <button type="button" className="btn" onClick={onApplyPlayer}>
+            Apply
+          </button>
         </div>
       </footer>
 
-      {/* PICKER MODAL */}
       <PickerModal
         open={pickerOpen}
         title={`Pick a ${category.slice(0, 1).toUpperCase() + category.slice(1)}`}
@@ -370,11 +367,22 @@ function RefreshIcon({ spinning }: { spinning?: boolean }) {
       height="18"
       viewBox="0 0 24 24"
       aria-hidden="true"
-      className={spinning ? "spin" : undefined}
+      style={spinning ? { animation: "spin 1s linear infinite" } : undefined}
     >
       <path
-        fill="currentColor"
-        d="M12 6V3L8 7l4 4V8c2.76 0 5 2.24 5 5a5 5 0 0 1-8.66 3.54l-1.42 1.42A7 7 0 0 0 19 13c0-3.87-3.13-7-7-7zm-5 5a5 5 0 0 1 8.66-3.54l1.42-1.42A7 7 0 0 0 5 11c0 3.87 3.13 7 7 7v3l4-4-4-4v3c-2.76 0-5-2.24-5-5z"
+        d="M21 12a9 9 0 1 1-2.64-6.36"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M21 3v7h-7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
