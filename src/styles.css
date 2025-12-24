@@ -437,35 +437,34 @@ body{
 
 .listIcon{ width: 22px; height: 22px; }
 
-.header{
-  position: relative;   /* 👈 ADD THIS */
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding: 6px 0;
-}
+.headerCenter{ position: relative; }
 
 .headerActions{
   position: absolute;
-  right: 14px;          /* 👈 pushes it to the far right of the page */
-  top: 50%;
-  transform: translateY(-50%); /* vertical centering */
+  top: 8px;
+  right: 10px;
   display: flex;
-  align-items: center;
+  gap: 8px;
 }
 
 .iconBtn{
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.22);
-  background: rgba(255,255,255,0.10); /* same grey as .btn */
-  color: var(--text);                 /* makes icon white */
+  background: rgba(255,255,255,0.10);
+  color: var(--text);
   display:flex;
   align-items:center;
   justify-content:center;
   cursor:pointer;
 }
+
+.iconBtn:disabled{ opacity: 0.5; cursor: not-allowed; }
+
+.spin{ animation: spin 0.9s linear infinite; }
+@keyframes spin{ to { transform: rotate(360deg); } }
+
 
 .iconBtn:hover{
   background: rgba(255,255,255,0.14);

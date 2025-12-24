@@ -21,7 +21,8 @@ function slug(name: string) {
   return name
     .toLowerCase()
     .replace(/[:'()]/g, "")
-    .replace(/\s+/g, "-");
+    .replace(/[^a-z0-9]+/g, "-")  // replace ANY non-alphanumeric with single dash
+    .replace(/^-+|-+$/g, "");     // trim leading/trailing dashes
 }
 
 export function mapHiscoresToDisplayItems(data: HiscoresResponse): DisplayItem[] {

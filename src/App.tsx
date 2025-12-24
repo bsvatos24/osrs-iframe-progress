@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Category, DisplayItem } from "./lib/types";
 import { fetchHiscores } from "./lib/hiscoresApi";
 import { mapHiscoresToDisplayItems } from "./lib/mapToDisplayItems";
@@ -24,28 +24,8 @@ export default function App() {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Fetch data
-  useEffect(() => {
-    const ac = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    fetchHiscores(player, ac.signal)
-      .then((data) => {
-        const mapped = mapHiscoresToDisplayItems(data);
-        setItems(mapped);
-        setIndex(0);
-      })
-      .catch((e: unknown) => {
-        if ((e as any)?.name === "AbortError") return;
-        setError((e as Error).message ?? "Unknown error");
-      })
-      .finally(() => setLoading(false));
-
-    return () => ac.abort();
-  }, [player]);
 
   const filtered = useMemo(
     () => items.filter((i) => i.category === category),
@@ -60,6 +40,69 @@ export default function App() {
     if (idx >= 0) setIndex(idx);
   }
 
+  /**
+   * Load data helper:
+   * - if keepSelection = true, we keep category + current item (by id if possible)
+   * - never touches pinned / pinnedId
+   */
+  const loadData = useCallback(
+    async (opts?: { keepSelection?: boolean }) => {
+      const keepSelection = opts?.keepSelection ?? false;
+
+      const prevCategory = category;
+      const prevIndex = index;
+      const prevId = current?.id ?? null;
+
+      const ac = new AbortController();
+
+      setError(null);
+      if (keepSelection) setRefreshing(true);
+      else setLoading(true);
+
+      try {
+        const data = await fetchHiscores(player, ac.signal);
+        const mapped = mapHiscoresToDisplayItems(data);
+        setItems(mapped);
+
+        if (keepSelection) {
+          // rebuild filtered list for the same category
+          const nextFiltered = mapped.filter((i) => i.category === prevCategory);
+
+          let nextIndex = 0;
+
+          // prefer ID match if possible
+          if (prevId) {
+            const found = nextFiltered.findIndex((x) => x.id === prevId);
+            if (found >= 0) nextIndex = found;
+            else nextIndex = Math.min(prevIndex, Math.max(0, nextFiltered.length - 1));
+          } else {
+            nextIndex = Math.min(prevIndex, Math.max(0, nextFiltered.length - 1));
+          }
+
+          setCategory(prevCategory);
+          setIndex(nextIndex);
+        } else {
+          // initial load / player change: reset selection
+          setIndex(0);
+        }
+      } catch (e: unknown) {
+        if ((e as any)?.name === "AbortError") return;
+        setError((e as Error).message ?? "Unknown error");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+
+      return () => ac.abort();
+    },
+    [player, category, index, current?.id]
+  );
+
+  // Initial fetch + when player changes (reset selection)
+  useEffect(() => {
+    loadData({ keepSelection: false });
+  }, [player, loadData]);
+
   // Auto cycle (only if not pinned and we have items)
   useEffect(() => {
     if (pinned || pinnedId) return;
@@ -72,23 +115,48 @@ export default function App() {
     return () => window.clearInterval(t);
   }, [pinned, pinnedId, filtered.length]);
 
-  // Reset selection when category or player changes
+  // When category changes, just reset index (DO NOT reset pin states)
   useEffect(() => {
     setIndex(0);
-    setPinned(false);
-    setPinnedId(null);
-  }, [category, player]);
+  }, [category]);
+
+  // If pinnedId is set, always keep us on it (within current category)
+  useEffect(() => {
+    if (!pinnedId) return;
+
+    const idx = filtered.findIndex((x) => x.id === pinnedId);
+    if (idx >= 0) {
+      setPinned(true);
+      setIndex(idx);
+    }
+  }, [pinnedId, filtered]);
+
+  function onRefresh() {
+    // re-fetch, keep same selection + pinned status
+    loadData({ keepSelection: true });
+  }
 
   return (
     <div className="app">
       <header className="header">
-        {/* top-right picker button */}
+        {/* top-right buttons */}
         <div className="headerActions">
+          <button
+            className="iconBtn"
+            onClick={onRefresh}
+            aria-label="Refresh"
+            title="Refresh"
+            disabled={loading || refreshing}
+          >
+            <RefreshIcon spinning={refreshing} />
+          </button>
+
           <button
             className="iconBtn"
             onClick={() => setPickerOpen(true)}
             aria-label="Pick item"
             title="Pick item"
+            disabled={loading}
           >
             <GridIcon />
           </button>
@@ -114,6 +182,8 @@ export default function App() {
                 : "No data"}
             </div>
           </div>
+
+          {error ? <div style={{ marginTop: 6, color: "rgba(255,255,255,0.75)" }}>{error}</div> : null}
         </div>
       </header>
 
@@ -162,7 +232,6 @@ export default function App() {
                   top: `${fmt(current.secondaryCurrent ?? 0)}`,
                   bottom: `${fmt(current.secondaryTarget ?? 1)}`
                 }}
-                // ✅ XP left to 99 (or to secondary target)
                 centerSub={`${fmt((current.secondaryTarget ?? 0) - (current.secondaryCurrent ?? 0))} XP Left`}
                 centerHint="To 99"
               />
@@ -211,12 +280,17 @@ export default function App() {
           <button
             className={`btn ${pinned || pinnedId ? "btnPin" : ""}`}
             onClick={() => {
-              // Toggle pin: if pinning manually, we clear pinnedId
+              // Toggle manual pin; if pinning manually, clear pinnedId
               setPinned((p) => {
                 const next = !p;
                 if (next) setPinnedId(null);
                 return next;
               });
+
+              // If unpinning manually, also clear pinnedId (so cycling can resume)
+              if (pinned || pinnedId) {
+                setPinnedId(null);
+              }
             }}
           >
             {pinned || pinnedId ? "Pinned" : "Pin"}
@@ -285,6 +359,23 @@ function GridIcon() {
       <rect x="11" y="2" width="5" height="5" rx="1" />
       <rect x="2" y="11" width="5" height="5" rx="1" />
       <rect x="11" y="11" width="5" height="5" rx="1" />
+    </svg>
+  );
+}
+
+function RefreshIcon({ spinning }: { spinning?: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={spinning ? "spin" : undefined}
+    >
+      <path
+        fill="currentColor"
+        d="M12 6V3L8 7l4 4V8c2.76 0 5 2.24 5 5a5 5 0 0 1-8.66 3.54l-1.42 1.42A7 7 0 0 0 19 13c0-3.87-3.13-7-7-7zm-5 5a5 5 0 0 1 8.66-3.54l1.42-1.42A7 7 0 0 0 5 11c0 3.87 3.13 7 7 7v3l4-4-4-4v3c-2.76 0-5-2.24-5-5z"
+      />
     </svg>
   );
 }
