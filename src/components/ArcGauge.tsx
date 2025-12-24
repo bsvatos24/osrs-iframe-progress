@@ -48,7 +48,7 @@ export function ArcGauge({
 }: Props) {
   const pct = max <= 0 ? 0 : clamp((value / max) * 100, 0, 100);
 
-  const size = 220;
+  const size = 200;
   const stroke = 14;
   const r = (size - stroke) / 2;
   const cx = size / 2;
