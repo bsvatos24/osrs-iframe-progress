@@ -37,7 +37,6 @@ const SKILL_GRID_ORDER: string[] = [
 ];
 
 export default function App() {
-  const [playerChoice, setPlayerChoice] = useState(DEFAULT_PLAYER);
   const [player, setPlayer] = useState(DEFAULT_PLAYER);
 
   const [items, setItems] = useState<DisplayItem[]>([]);
@@ -127,10 +126,6 @@ export default function App() {
 
     return () => window.clearInterval(t);
   }, [category, pinned, pinnedId, filtered.length]);
-
-  function onApplyPlayer() {
-    setPlayer(playerChoice);
-  }
 
   function onRefresh() {
     setRefreshing(true);
@@ -364,9 +359,6 @@ export default function App() {
             disabled={loading || refreshing}
           />
 
-          <button type="button" className="btn" onClick={onApplyPlayer}>
-            Apply
-          </button>
         </div>
       </footer>
 
