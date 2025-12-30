@@ -1,4 +1,4 @@
-export type Category = "skills" | "bosses" | "activities";
+export type Category = "skills" | "bosses" | "activities" | "total" | "gim";
 
 export type DisplayItem = {
   id: string;
@@ -9,20 +9,23 @@ export type DisplayItem = {
   // Top-left (primary arc)
   primaryCurrent: number;
   primaryTarget: number;
-  primaryLabelTop: string;     // e.g. "54% Complete"
-  primaryLabelBottom: string;  // e.g. "XP to next level"
+  primaryLabelTop: string;
+  primaryLabelBottom: string;
 
   // Top-right (secondary)
   secondaryType: "gauge" | "rank";
   secondaryCurrent?: number;
   secondaryTarget?: number;
-  secondaryLabelTop: string;   // e.g. "Level 73 / 99" OR "Rank"
+  secondaryLabelTop: string;
   secondaryLabelBottom?: string;
 
   // Bottom milestones bar
-  milestones: number[];        // e.g. [70,80,90,99]
-  milestoneCurrent: number;    // level or kills
+  milestones: number[];
+  milestoneCurrent: number;
   milestoneUnit: "level" | "kills";
 
+  // ✅ Skill-only extras (for Total tab)
   skillLevel?: number;
+  skillXp?: number;
+  levelProgressPct?: number; // 0-100 within current level to next
 };

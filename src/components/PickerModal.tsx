@@ -37,32 +37,38 @@ export function PickerModal({ open, title, items, pinnedId, onClose, onSelect, o
           onChange={(e) => setQ(e.target.value)}
         />
 
-        {/* GRID instead of rows */}
         <div className="pickerGrid">
           {filtered.map((it) => {
-            const pinned = pinnedId === it.id;
+            const isPinned = pinnedId === it.id;
 
             return (
               <button
-                type="button"
                 key={it.id}
-                className={`pickerTile ${pinned ? "pickerTilePinned" : ""}`}
+                type="button"
+                className={`pickerCell ${isPinned ? "pickerCellPinned" : ""}`}
                 onClick={() => onSelect(it.id)}
                 title={it.name}
               >
-                <img className="pickerTileIcon" src={it.iconUrl} alt="" />
-                <div className="pickerTileName">{it.name}</div>
+                <img className="pickerIcon" src={it.iconUrl} alt="" />
+                <div className="pickerName">{it.name}</div>
+
+                <div className="pickerPinRow">
+                  <span className="pickerPinText">{isPinned ? "Pinned" : "Pin"}</span>
+                  <button
+                    type="button"
+                    className={`btn btnMini ${isPinned ? "btnPin" : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPin(it.id);
+                    }}
+                    aria-label={isPinned ? "Unpin" : "Pin"}
+                  >
+                    📌
+                  </button>
+                </div>
               </button>
             );
           })}
-        </div>
-
-        {/* Optional pin controls row (only if you still want pinning in modal) */}
-        {/* If you want pin on right-click instead, tell me and I’ll wire it. */}
-        <div style={{ display: "none" }}>
-          {filtered.map((it) => (
-            <button type="button" key={it.id} onClick={() => onPin(it.id)}>{it.name}</button>
-          ))}
         </div>
       </div>
     </div>

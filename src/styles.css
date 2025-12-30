@@ -3,19 +3,26 @@
   --bg: #000000;                 /* device background */
   --card: #000000;               /* widget background */
   --border: rgba(255,255,255,0.18);
-
   --text: #ffffff;               /* widget text color */
   --muted: rgba(255,255,255,0.75);
   --dim: rgba(255,255,255,0.55);
-
   --accent: #ef50e7;             /* widget accent color */
-
   --shadow: 0 10px 25px rgba(0,0,0,0.55);
+  --surface-grey: rgba(255,255,255,0.10);
+  --surface-grey-border: rgba(255,255,255,0.22);
 }
 
 /* Base */
-*{ box-sizing:border-box; }
-html, body, #root { height:100%; margin:0; }
+*{ 
+  box-sizing:border-box; 
+}
+
+html, body, #root { 
+  height:720px;
+  margin:0;
+  overflow: hidden;
+ }
+
 body{
   background: var(--bg);
   color: var(--text);
@@ -23,11 +30,13 @@ body{
 }
 
 .app{
-  height:100%;
+  height:720px;
   display:flex;
   flex-direction:column;
   gap: 12px;
   padding: 14px;
+  overflow: hidden;
+  min-height: 0; /* important for child overflow */
 }
 
 /* Header */
@@ -103,6 +112,7 @@ body{
   gap: 12px;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .card{
@@ -121,6 +131,7 @@ body{
   align-items:stretch;
   justify-content:stretch;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Gauge */
@@ -368,6 +379,7 @@ body{
   align-items:center;
   justify-content:center;
   padding: 16px;
+  z-index: 9999;
 }
 
 .modal{
@@ -382,6 +394,7 @@ body{
   display:flex;
   flex-direction:column;
   gap: 10px;
+  z-index: 10000;
 }
 
 .modalHeader{
@@ -403,6 +416,34 @@ body{
   border: 1px solid rgba(255,255,255,0.20);
   background: rgba(255,255,255,0.06);
   color: var(--text);
+}
+
+.select{
+  width: 180px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.20);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+}
+
+/* Helps the CLOSED select match your theme (already good) */
+select.input{
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.10);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.22);
+}
+
+/* Some browsers honor these, some ignore them */
+select.input option{
+  background: #111 !important;
+  color: #fff !important;
+}
+select.input optgroup{
+  background: #111 !important;
+  color: #fff !important;
 }
 
 .list{
@@ -543,4 +584,393 @@ body{
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.pickerGrid{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  overflow:auto;
+  padding-right: 6px;
+}
+
+.pickerCell{
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  border-radius: 14px;
+  padding: 10px;
+  cursor:pointer;
+  color: var(--text);
+  text-align:center;
+  box-shadow: var(--shadow);
+}
+
+.pickerCellPinned{
+  border-color: rgba(239,80,231,0.85);
+  box-shadow: 0 0 0 2px rgba(239,80,231,0.15), var(--shadow);
+}
+
+.pickerIcon{
+  width: 32px;
+  height: 32px;
+  display:block;
+  margin: 0 auto 8px auto;
+}
+
+.pickerName{
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
+.pickerPinRow{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap: 8px;
+}
+
+.pickerPinText{
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.btnMini{
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.totalWrap{
+  width: 100%;
+  display:flex;
+  flex-direction:column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.totalGrid{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.skillTile{
+  border: var(--surface-grey-border);
+  background: var(--surface-grey);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 10px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  min-height: 74px;
+}
+
+.skillTileTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+}
+
+.skillTileIcon{
+  width: 28px;
+  height: 28px;
+  display:block;
+}
+
+.skillTileLevel{
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.skillTileBar{
+  height: 6px;
+  border-radius: 999px;
+  overflow:hidden;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.10);
+  margin-top: 8px;
+}
+
+.skillTileBarFill{
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+}
+
+.totalFooter{
+  display:flex;
+  justify-content:space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.10);
+}
+
+.totalFooterStat{
+  display:flex;
+  flex-direction:column;
+  gap: 4px;
+}
+
+.totalFooterLabel{
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.totalFooterValue{
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.skillTileName{
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* GIM panel styling */
+.gimPanel{
+  width:100%;
+  height:90%;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(0,0,0,0.90);
+  box-shadow: var(--shadow);
+  padding: 10px;
+  display:flex;
+  flex-direction:column;
+  gap: 8px;
+}
+
+.gimPanelHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+}
+
+.gimPanelName{
+  font-weight: 900;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.gimPanelTag{
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+}
+
+:root{
+  --gim-cell-min: 44px;  /* <-- TUNE THIS (try 40, 38, 36 if you need tighter) */
+  --gim-cell-gap: 6px;   /* <-- gap between skill cells */
+}
+
+.mainFill{
+  flex: 1;
+  min-height: 0; /* important so inner scroll areas work */
+  display:flex;
+}
+
+.gimSkillsGrid{
+  display:grid;
+  grid-template-columns: repeat(var(--gim-cols, 8), minmax(0, 1fr));
+  gap: 6px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+/* Smaller skill cells */
+.gimSkillCell{
+  border: var(--surface-grey-border);
+  background: var(--surface-grey);
+  border-radius: 10px;
+
+  padding: 6px;         /* <-- also affects size */
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+}
+
+/* icon + level */
+.gimSkillTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 6px;
+}
+
+.gimSkillIcon{
+  width: 18px;          /* <-- icon size knob */
+  height: 18px;
+}
+
+.gimSkillLvl{
+  color: var(--text);
+  font-weight: 900;
+  font-size: 12px;      /* <-- level text knob */
+  line-height: 1;
+}
+
+/* progress bar */
+.gimSkillBarTrack{
+  height: 5px;          /* <-- bar thickness knob */
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  overflow:hidden;
+}
+
+.gimSkillBarFill{
+  height: 100%;
+  border-radius: 999px;
+}
+
+.gimTotals{
+  display:flex;
+  justify-content:space-between;
+  gap: 10px;
+  padding-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.gimTotals span{
+  color: var(--text);
+  font-weight: 900;
+}
+
+/* GIM layout (die-5 pattern) */
+.gimLayout{
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 520px; /* adjust for your screen */
+}
+
+.gimSlot{
+  position: absolute;
+  width: 33%;
+  height: 45%;
+  min-width: 260px;
+}
+
+.gimSlot.tl{ top: 0; left: 0; }
+.gimSlot.tr{ top: 0; right: 0; }
+.gimSlot.bl{ bottom: 0; left: 0; }
+.gimSlot.br{ bottom: 0; right: 0; }
+.gimSlot.c{
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 33%;
+  height: 45%;
+}
+
+/* Player menu (custom dropdown) */
+.playerMenu{
+  position: relative;
+}
+
+.playerMenuBtn{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  min-width: 180px;
+  justify-content:space-between;
+}
+
+.playerMenuValue{
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.playerMenuChevron{
+  opacity: 0.85;
+  transform: translateY(-1px);
+  transition: transform 120ms ease;
+}
+.playerMenuChevron.open{
+  transform: rotate(180deg) translateY(1px);
+}
+
+.playerMenuPanel{
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px); /* opens upward from footer */
+  width: 220px;
+  z-index: 9999;
+
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(0,0,0,0.95);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+
+  display:flex;
+  flex-direction:column;
+  padding: 6px;
+}
+
+.playerMenuItem{
+  width: 100%;
+  text-align:left;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 10px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.playerMenuItem:hover{
+  background: rgba(255,255,255,0.10);
+}
+
+.playerMenuItem.active{
+  background: rgba(255,255,255,0.14);
+  outline: 1px solid rgba(255,255,255,0.18);
+}
+
+.headerGimOnly{
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+  text-align: center;
+  padding: 2px 6px;
+}
+
+/* shrink the headerCenter padding specifically on the gim header if you want */
+.headerCenter:has(.headerGimOnly){
+  padding: 6px 12px;
+  gap: 0;
+}
+
+.cardTotal{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  overflow:hidden;
+}
+
+/* the TotalGrid root wrapper should fill and scroll */
+.totalGridWrap{
+  flex: 1;
+  min-height: 0;
+  overflow: auto;  /* ✅ scroll inside the card, not the page */
 }

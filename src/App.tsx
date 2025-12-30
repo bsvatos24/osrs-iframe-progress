@@ -7,14 +7,37 @@ import { ArcGauge } from "./components/ArcGauge";
 import { RankBadge } from "./components/RankBadge";
 import { MilestoneBar } from "./components/MilestoneBar";
 import { PickerModal } from "./components/PickerModal";
+import { TotalGrid } from "./components/TotalGrid";
+import { GimView } from "./components/GimView";
+import { PlayerMenu } from "./components/PlayerMenu";
 
 import "./styles.css";
 
 const DEFAULT_PLAYER = "BenjiFresh91";
 
+// ✅ dropdown options (add more as you want)
+const PLAYER_OPTIONS = [
+  "BenjiFresh91",
+  "IronBengal",
+  "Kobenhamner",
+  "Z o i n k z",
+  "PacmanPier"
+];
+
+// ✅ skill order used in picker + total
+const SKILL_GRID_ORDER: string[] = [
+  "Attack", "Hitpoints", "Mining",
+  "Strength", "Agility", "Smithing",
+  "Defence", "Herblore", "Fishing",
+  "Ranged", "Thieving", "Cooking",
+  "Prayer", "Crafting", "Firemaking",
+  "Magic", "Fletching", "Woodcutting",
+  "Runecraft", "Slayer", "Farming",
+  "Construction", "Hunter", "Sailing"
+];
+
 export default function App() {
-  // ✅ keep an input value separate from the "applied" player
-  const [playerInput, setPlayerInput] = useState(DEFAULT_PLAYER);
+  const [playerChoice, setPlayerChoice] = useState(DEFAULT_PLAYER);
   const [player, setPlayer] = useState(DEFAULT_PLAYER);
 
   const [items, setItems] = useState<DisplayItem[]>([]);
@@ -30,55 +53,53 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ used to force a refresh without changing player/category/index
   const [refreshNonce, setRefreshNonce] = useState(0);
 
-  // Track “current selection” by id so refresh can keep you on the same item
   const lastSelectedIdRef = useRef<string | null>(null);
 
-  const filtered = useMemo(
-    () => items.filter((i) => i.category === category),
-    [items, category]
+  // Skills subset for Total tab + ordering
+  const skillItems = useMemo(
+    () => items.filter((i) => i.category === "skills"),
+    [items]
   );
+
+  const filtered = useMemo(() => {
+    if (category === "total") return [];
+    return items.filter((i) => i.category === category);
+  }, [items, category]);
 
   const current = filtered[index] ?? null;
 
-  // Keep ref updated with currently shown item id
   useEffect(() => {
     lastSelectedIdRef.current = current?.id ?? null;
   }, [current?.id]);
 
-  // ✅ Fetch only on:
-  // - initial mount
-  // - player changes via "Apply"
-  // - explicit refresh button click (refreshNonce change)
+  // Fetch only on player/apply + refresh button
   useEffect(() => {
     const ac = new AbortController();
 
-    const isInitial = refreshNonce === 0 && player === DEFAULT_PLAYER && items.length === 0;
-    if (isInitial) setLoading(true);
-
     setError(null);
+    if (refreshNonce === 0 && items.length === 0) setLoading(true);
 
     fetchHiscores(player, ac.signal)
       .then((data) => {
         const mapped = mapHiscoresToDisplayItems(data);
         setItems(mapped);
 
-        // ✅ after refresh, try to stay on same item (by id) inside the current category
-        const desiredId = pinnedId ?? lastSelectedIdRef.current;
-        if (desiredId) {
-          const nextFiltered = mapped.filter((i) => i.category === category);
-          const idx = nextFiltered.findIndex((x) => x.id === desiredId);
-          if (idx >= 0) setIndex(idx);
-          else setIndex(0);
-        } else {
-          // if not pinned and no prior selection, keep index but clamp
-          setIndex((prev) => {
+        // keep selection in current category (non-total)
+        if (category !== "total") {
+          const desiredId = pinnedId ?? lastSelectedIdRef.current;
+          if (desiredId) {
             const nextFiltered = mapped.filter((i) => i.category === category);
-            if (nextFiltered.length === 0) return 0;
-            return Math.min(prev, nextFiltered.length - 1);
-          });
+            const idx = nextFiltered.findIndex((x) => x.id === desiredId);
+            setIndex(idx >= 0 ? idx : 0);
+          } else {
+            setIndex((prev) => {
+              const nextFiltered = mapped.filter((i) => i.category === category);
+              if (nextFiltered.length === 0) return 0;
+              return Math.min(prev, nextFiltered.length - 1);
+            });
+          }
         }
       })
       .catch((e: unknown) => {
@@ -91,18 +112,12 @@ export default function App() {
       });
 
     return () => ac.abort();
-    // ✅ IMPORTANT: index is NOT in deps, so auto-cycle cannot trigger a fetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player, refreshNonce, category, pinnedId]);
+  }, [player, refreshNonce]);
 
-  // Jump to item by id within current category
-  function jumpToId(id: string) {
-    const idx = filtered.findIndex((x) => x.id === id);
-    if (idx >= 0) setIndex(idx);
-  }
-
-  // Auto cycle (only if not pinned and we have items)
+  // Auto cycle (disabled on Total)
   useEffect(() => {
+    if (category === "total") return;
     if (pinned || pinnedId) return;
     if (filtered.length <= 1) return;
 
@@ -111,25 +126,32 @@ export default function App() {
     }, 6000);
 
     return () => window.clearInterval(t);
-  }, [pinned, pinnedId, filtered.length]);
-
-  // Reset selection when category changes (but DO NOT refetch)
-  useEffect(() => {
-    setIndex(0);
-    // keep pinned state as-is unless you want category change to unpin
-    // (right now we keep it)
-  }, [category]);
+  }, [category, pinned, pinnedId, filtered.length]);
 
   function onApplyPlayer() {
-    const next = playerInput.trim();
-    if (!next) return;
-    setPlayer(next); // ✅ triggers fetch
+    setPlayer(playerChoice);
   }
 
   function onRefresh() {
     setRefreshing(true);
-    setRefreshNonce((n) => n + 1); // ✅ triggers fetch, keeps state
+    setRefreshNonce((n) => n + 1);
   }
+
+  function jumpToId(id: string) {
+    const idx = filtered.findIndex((x) => x.id === id);
+    if (idx >= 0) setIndex(idx);
+  }
+
+  // Ordered items for picker when Skills
+  const pickerItems = useMemo(() => {
+    if (category === "skills") {
+      const byName = new Map(filtered.map((s) => [s.name, s]));
+      const ordered = SKILL_GRID_ORDER.map((n) => byName.get(n)).filter(Boolean) as DisplayItem[];
+      return ordered;
+    }
+    // bosses/activities: keep as-is or sort alphabetically
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  }, [category, filtered]);
 
   return (
     <div className="app">
@@ -152,122 +174,152 @@ export default function App() {
             onClick={() => setPickerOpen(true)}
             aria-label="Pick item"
             title="Pick item"
-            disabled={loading}
+            disabled={loading || category === "total"}
           >
             <GridIcon />
           </button>
         </div>
 
         <div className="headerCenter">
-          <div className="headerPlayer">{player}</div>
+          {category === "gim" ? (
+            <div className="headerGimOnly">GIM Levels</div>
+          ) : (
+            <>
+            <div className="headerPlayer">{player}</div>
 
           <div className="headerItemRow">
             <div className="iconWrap">
-              {current?.iconUrl ? (
+              {category === "total" ? (
+                <img className="icon" src={`${import.meta.env.BASE_URL}icons/skills/total.png`} alt="Total"/>
+              ) : current?.iconUrl ? (
                 <img className="icon" src={current.iconUrl} alt={current.name} />
               ) : null}
             </div>
 
+
             <div className="title">
-              {current
+              {category === "total"
+                ? "Totals"
+                : current
                 ? current.category === "skills"
-                  ? `${current.name} - ${current.skillLevel ?? current.milestoneCurrent}`
+                  ? `${current.name} - ${(current.skillLevel ?? current.milestoneCurrent) ?? 0}`
                   : current.name
                 : loading
                 ? "Loading..."
                 : "No data"}
             </div>
           </div>
+          </>
+          )}
+
         </div>
       </header>
 
-      <main className="grid">
-        <section className="card cardArc">
-          {loading ? (
-            <div>Loading…</div>
-          ) : error ? (
-            <div>{error}</div>
-          ) : current ? (
-            <ArcGauge
-              value={current.primaryCurrent}
-              max={current.primaryTarget}
-              labelTop={current.primaryLabelTop}
-              centerMainParts={{
-                top: `${fmt(current.primaryCurrent)}`,
-                bottom: `${fmt(current.primaryTarget)}`
-              }}
-              centerSub={`${fmt(current.primaryTarget - current.primaryCurrent)} XP Left`}
-              centerHint={current.milestoneUnit === "kills" ? "To next milestone" : "To next level"}
-            />
-          ) : (
-            <div>No item</div>
-          )}
-        </section>
+      {/* MAIN */}
+{category === "total" ? (
+  <main className="grid">
+    <section className="card full cardTotal">
+      {loading ? (
+        <div>Loading…</div>
+      ) : error ? (
+        <div>{error}</div>
+      ) : (
+        <TotalGrid skillItems={skillItems} />
+      )}
+    </section>
+  </main>
+) : category === "gim" ? (
+  <main className="mainFill">
+    <section className="card full cardTotal" style={{ width: "100%", height: "100%" }}>
+      <GimView />
+    </section>
+  </main>
+) : (
+  <main className="grid">
+    <section className="card cardArc">
+      {loading ? (
+        <div>Loading…</div>
+      ) : error ? (
+        <div>{error}</div>
+      ) : current ? (
+        <ArcGauge
+          value={current.primaryCurrent}
+          max={current.primaryTarget}
+          labelTop={current.primaryLabelTop}
+          centerMainParts={{
+            top: `${fmt(current.primaryCurrent)}`,
+            bottom: `${fmt(current.primaryTarget)}`
+          }}
+          centerSub={`${fmt(current.primaryTarget - current.primaryCurrent)} XP Left`}
+          centerHint={current.milestoneUnit === "kills" ? "To next milestone" : "To next level"}
+        />
+      ) : (
+        <div>No item</div>
+      )}
+    </section>
 
-        <section className="card cardArc">
-          {loading ? (
-            <div>Loading…</div>
-          ) : error ? (
-            <div>{error}</div>
-          ) : current ? (
-            current.secondaryType === "rank" ? (
-              <RankBadge
-                labelTop={current.secondaryLabelTop}
-                valueText={formatRank(current.secondaryCurrent ?? -1)}
-              />
-            ) : (
-              <ArcGauge
-                value={current.secondaryCurrent ?? 0}
-                max={current.secondaryTarget ?? 1}
-                labelTop={current.secondaryLabelTop}
-                centerMainParts={{
-                  top: `${fmt(current.secondaryCurrent ?? 0)}`,
-                  bottom: `${fmt(current.secondaryTarget ?? 1)}`
-                }}
-                centerSub={`${fmt((current.secondaryTarget ?? 0) - (current.secondaryCurrent ?? 0))} XP Left`}
-                centerHint="To 99"
-              />
-            )
-          ) : (
-            <div>No item</div>
-          )}
-        </section>
+    <section className="card cardArc">
+      {loading ? (
+        <div>Loading…</div>
+      ) : error ? (
+        <div>{error}</div>
+      ) : current ? (
+        current.secondaryType === "rank" ? (
+          <RankBadge
+            labelTop={current.secondaryLabelTop}
+            valueText={formatRank(current.secondaryCurrent ?? -1)}
+          />
+        ) : (
+          <ArcGauge
+            value={current.secondaryCurrent ?? 0}
+            max={current.secondaryTarget ?? 1}
+            labelTop={current.secondaryLabelTop}
+            centerMainParts={{
+              top: `${fmt(current.secondaryCurrent ?? 0)}`,
+              bottom: `${fmt(current.secondaryTarget ?? 1)}`
+            }}
+            centerSub={`${fmt((current.secondaryTarget ?? 0) - (current.secondaryCurrent ?? 0))} XP Left`}
+            centerHint="To 99"
+          />
+        )
+      ) : (
+        <div>No item</div>
+      )}
+    </section>
 
-        <section className="card full">
-          {current ? (
-            <MilestoneBar
-              title={current.milestoneUnit === "level" ? "Level Milestones" : "Killcount Milestones"}
-              milestones={current.milestones}
-              current={current.milestoneCurrent}
-              unit={current.milestoneUnit}
-            />
-          ) : null}
-        </section>
-      </main>
+    <section className="card full cardTotal">
+      {current ? (
+        <MilestoneBar
+          title={current.milestoneUnit === "level" ? "Level Milestones" : "Killcount Milestones"}
+          milestones={current.milestones}
+          current={current.milestoneCurrent}
+          unit={current.milestoneUnit}
+        />
+      ) : null}
+    </section>
+  </main>
+)}
 
+
+      {/* FOOTER */}
       <footer className="footer">
         <div className="tabs">
-          <button
-            type="button"
-            className={`tab ${category === "skills" ? "tabActive" : ""}`}
-            onClick={() => setCategory("skills")}
-          >
+          <button type="button" className={`tab ${category === "skills" ? "tabActive" : ""}`} onClick={() => setCategory("skills")}>
             Skills
           </button>
-          <button
-            type="button"
-            className={`tab ${category === "bosses" ? "tabActive" : ""}`}
-            onClick={() => setCategory("bosses")}
-          >
+          <button type="button" className={`tab ${category === "bosses" ? "tabActive" : ""}`} onClick={() => setCategory("bosses")}>
             Bosses
           </button>
-          <button
-            type="button"
-            className={`tab ${category === "activities" ? "tabActive" : ""}`}
-            onClick={() => setCategory("activities")}
-          >
+          <button type="button" className={`tab ${category === "activities" ? "tabActive" : ""}`} onClick={() => setCategory("activities")}>
             Activities
           </button>
+          <button type="button" className={`tab ${category === "total" ? "tabActive" : ""}`} onClick={() => setCategory("total")}>
+            Total
+          </button>
+          <button type="button" className={`tab ${category === "gim" ? "tabActive" : ""}`} onClick={() => setCategory("gim")}>
+            GIM
+          </button>
+
         </div>
 
         <div className="controls">
@@ -281,6 +333,7 @@ export default function App() {
                 return next;
               });
             }}
+            disabled={category === "total"}
           >
             {pinned || pinnedId ? "Pinned" : "Pin"}
           </button>
@@ -289,7 +342,7 @@ export default function App() {
             type="button"
             className="btn"
             onClick={() => setIndex((i) => Math.max(0, i - 1))}
-            disabled={filtered.length === 0}
+            disabled={filtered.length === 0 || category === "total"}
           >
             Prev
           </button>
@@ -298,20 +351,17 @@ export default function App() {
             type="button"
             className="btn"
             onClick={() => setIndex((i) => (filtered.length ? (i + 1) % filtered.length : 0))}
-            disabled={filtered.length === 0}
+            disabled={filtered.length === 0 || category === "total"}
           >
             Next
           </button>
 
-          <input
-            className="input"
-            style={{ width: 180 }}
-            value={playerInput}
-            onChange={(e) => setPlayerInput(e.target.value)}
-            placeholder="Player name"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onApplyPlayer();
-            }}
+          {/* ✅ player dropdown */}
+          <PlayerMenu
+            value={player}
+            options={PLAYER_OPTIONS}
+            onChange={(next) => setPlayer(next)}
+            disabled={loading || refreshing}
           />
 
           <button type="button" className="btn" onClick={onApplyPlayer}>
@@ -320,10 +370,11 @@ export default function App() {
         </div>
       </footer>
 
+      {/* PICKER MODAL */}
       <PickerModal
         open={pickerOpen}
         title={`Pick a ${category.slice(0, 1).toUpperCase() + category.slice(1)}`}
-        items={filtered}
+        items={pickerItems}
         pinnedId={pinnedId}
         onClose={() => setPickerOpen(false)}
         onSelect={(id) => {
