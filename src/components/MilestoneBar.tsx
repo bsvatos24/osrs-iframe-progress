@@ -7,7 +7,7 @@ type Props = {
   unit: "level" | "kills";
 };
 
-export function MilestoneBar({ milestones, current, unit }: Props) {
+export function MilestoneBar({ milestones, current }: Props) {
   const start = 0;
   const points = [start, ...milestones];
 
