@@ -82,7 +82,6 @@ export function mapHiscoresToDisplayItems(data: HiscoresResponse): DisplayItem[]
 
     const span = Math.max(1, next - prev);
     const inSeg = Math.max(0, kills - prev);
-    const pct = clamp((inSeg / span) * 100, 0, 100);
 
     const item: DisplayItem = {
       id: `act-${a.id}`,
