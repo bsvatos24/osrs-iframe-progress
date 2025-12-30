@@ -18,33 +18,59 @@ const ORDER: string[][] = [
 ];
 
 export function GimPanel({ name, hiscores, ok, cols = 8 }: Props) {
-  const byName = new Map(hiscores.skills.map(s => [s.name, s]));
+  const isFallback = !ok;
 
+  // ✅ Only trust hiscores.skills if ok === true
+  const byName = new Map(
+    (isFallback ? [] : hiscores.skills).map((s) => [s.name, s] as const)
+  );
+
+  // ✅ Compute totals from ORDER skills so fallback totals are correct
   let totalLevel = 0;
   let totalXp = 0;
 
-  for (const s of hiscores.skills) {
-    if (s.name === "Overall") continue;
-    totalLevel += s.level ?? 1;
-    totalXp += s.xp ?? 1;
+  for (const skill of ORDER.flat()) {
+    if (isFallback) {
+      if (skill === "Hitpoints") {
+        totalLevel += 10;
+        totalXp += 1154;
+      } else {
+        totalLevel += 1;
+        totalXp += 0;
+      }
+    } else {
+      const s = byName.get(skill);
+      const level = s?.level ?? 1;
+      const xp = s?.xp ?? 0; // ✅ level 1 should mean 0 xp if missing
+      totalLevel += level;
+      totalXp += xp;
+    }
   }
 
   return (
     <div className="gimPanel">
       <div className="gimPanelHeader">
         <div className="gimPanelName">{name}</div>
-        {!ok ? <div className="gimPanelTag">Fallback</div> : null}
+        {isFallback ? <div className="gimPanelTag">Fallback</div> : null}
       </div>
 
       {/* ✅ 8 columns grid */}
       <div className="gimSkillsGrid" style={{ ["--gim-cols" as any]: cols }}>
         {ORDER.flat().map((skill) => {
-            const isFallback = !ok;
-            const s = byName.get(skill);
-            
-            const level = s?.level ?? (isFallback && skill === "Hitpoints" ? 10 : 1);
-            const xp = s?.xp ?? (isFallback && skill === "Hitpoints" ? 1154 : 0);
+          let level: number;
+          let xp: number;
 
+          if (isFallback) {
+            // ✅ fallback rule: HP=10 (1154xp), everything else = level 1 (0xp)
+            level = skill === "Hitpoints" ? 10 : 1;
+            xp = skill === "Hitpoints" ? 1154 : 0;
+          } else {
+            const s = byName.get(skill);
+            level = s?.level ?? 1;
+            xp = s?.xp ?? 0;
+          }
+
+          // % to next level for tiny bottom bar
           const curLevelXp = xpForLevel(level);
           const nextLevelXp = xpForLevel(Math.min(126, level + 1));
           const inLevel = Math.max(0, xp - curLevelXp);
@@ -92,6 +118,7 @@ function slug(name: string) {
     .replace(/\s+/g, "-");
 }
 
+// red -> yellow -> green based on pct
 function gradientColor(pct: number) {
   const p = clamp(pct, 0, 100);
   if (p <= 50) {
