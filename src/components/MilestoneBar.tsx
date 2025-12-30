@@ -13,7 +13,7 @@ export function MilestoneBar({ milestones, current, unit }: Props) {
 
   return (
     <div className="milestones">
-      <div className="milestoneTitle">Progress milestones ({unit})</div>
+      <div className="milestoneTitle">Overall Milestones</div>
 
       <div className="milestoneRow customScroll">
         {points.map((p, idx) => {

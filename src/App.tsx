@@ -64,6 +64,7 @@ export default function App() {
 
   const filtered = useMemo(() => {
     if (category === "total") return [];
+    if (category === "gim") return [];
     return items.filter((i) => i.category === category);
   }, [items, category]);
 
@@ -73,7 +74,7 @@ export default function App() {
     lastSelectedIdRef.current = current?.id ?? null;
   }, [current?.id]);
 
-  // Fetch only on player/apply + refresh button
+  // Fetch only on player change + refresh button
   useEffect(() => {
     const ac = new AbortController();
 
@@ -86,8 +87,9 @@ export default function App() {
         setItems(mapped);
 
         // keep selection in current category (non-total)
-        if (category !== "total") {
+        if (category !== "total" && category !== "gim") {
           const desiredId = pinnedId ?? lastSelectedIdRef.current;
+
           if (desiredId) {
             const nextFiltered = mapped.filter((i) => i.category === category);
             const idx = nextFiltered.findIndex((x) => x.id === desiredId);
@@ -114,9 +116,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, refreshNonce]);
 
-  // Auto cycle (disabled on Total)
+  // Auto cycle (disabled on Total + GIM)
   useEffect(() => {
     if (category === "total") return;
+    if (category === "gim") return;
     if (pinned || pinnedId) return;
     if (filtered.length <= 1) return;
 
@@ -141,12 +144,21 @@ export default function App() {
   const pickerItems = useMemo(() => {
     if (category === "skills") {
       const byName = new Map(filtered.map((s) => [s.name, s]));
-      const ordered = SKILL_GRID_ORDER.map((n) => byName.get(n)).filter(Boolean) as DisplayItem[];
+      const ordered = SKILL_GRID_ORDER
+        .map((n) => byName.get(n))
+        .filter(Boolean) as DisplayItem[];
       return ordered;
     }
-    // bosses/activities: keep as-is or sort alphabetically
+    // bosses/activities: sort alphabetically
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }, [category, filtered]);
+
+  // ✅ Primary (left arc) center sub label differs for skills vs bosses/activities
+  const primaryRemaining = current ? Math.max(0, current.primaryTarget - current.primaryCurrent) : 0;
+  const primarySub =
+    current?.milestoneUnit === "kills"
+      ? `${fmt(primaryRemaining)} Remaining`
+      : `${fmt(primaryRemaining)} XP Left`;
 
   return (
     <div className="app">
@@ -169,7 +181,7 @@ export default function App() {
             onClick={() => setPickerOpen(true)}
             aria-label="Pick item"
             title="Pick item"
-            disabled={loading || category === "total"}
+            disabled={loading || category === "total" || category === "gim"}
           >
             <GridIcon />
           </button>
@@ -180,121 +192,121 @@ export default function App() {
             <div className="headerGimOnly">GIM Levels</div>
           ) : (
             <>
-            <div className="headerPlayer">{player}</div>
+              <div className="headerPlayer">{player}</div>
 
-          <div className="headerItemRow">
-            <div className="iconWrap">
-              {category === "total" ? (
-                <img className="icon" src={`${import.meta.env.BASE_URL}icons/skills/total.png`} alt="Total"/>
-              ) : current?.iconUrl ? (
-                <img className="icon" src={current.iconUrl} alt={current.name} />
-              ) : null}
-            </div>
+              <div className="headerItemRow">
+                <div className="iconWrap">
+                  {category === "total" ? (
+                    <img
+                      className="icon"
+                      src={`${import.meta.env.BASE_URL}icons/skills/total.png`}
+                      alt="Total"
+                    />
+                  ) : current?.iconUrl ? (
+                    <img className="icon" src={current.iconUrl} alt={current.name} />
+                  ) : null}
+                </div>
 
-
-            <div className="title">
-              {category === "total"
-                ? "Totals"
-                : current
-                ? current.category === "skills"
-                  ? `${current.name} - ${(current.skillLevel ?? current.milestoneCurrent) ?? 0}`
-                  : current.name
-                : loading
-                ? "Loading..."
-                : "No data"}
-            </div>
-          </div>
-          </>
+                <div className="title">
+                  {category === "total"
+                    ? "Totals"
+                    : current
+                    ? current.category === "skills"
+                      ? `${current.name} - ${(current.skillLevel ?? current.milestoneCurrent) ?? 0}`
+                      : current.name
+                    : loading
+                    ? "Loading..."
+                    : "No data"}
+                </div>
+              </div>
+            </>
           )}
-
         </div>
       </header>
 
       {/* MAIN */}
-{category === "total" ? (
-  <main className="grid">
-    <section className="card full cardTotal">
-      {loading ? (
-        <div>Loading…</div>
-      ) : error ? (
-        <div>{error}</div>
+      {category === "total" ? (
+        <main className="grid">
+          <section className="card full cardTotal">
+            {loading ? <div>Loading…</div> : error ? <div>{error}</div> : <TotalGrid skillItems={skillItems} />}
+          </section>
+        </main>
+      ) : category === "gim" ? (
+        <main className="mainFill">
+          <section className="card full cardTotal" style={{ width: "100%", height: "100%" }}>
+            <GimView />
+          </section>
+        </main>
       ) : (
-        <TotalGrid skillItems={skillItems} />
-      )}
-    </section>
-  </main>
-) : category === "gim" ? (
-  <main className="mainFill">
-    <section className="card full cardTotal" style={{ width: "100%", height: "100%" }}>
-      <GimView />
-    </section>
-  </main>
-) : (
-  <main className="grid">
-    <section className="card cardArc">
-      {loading ? (
-        <div>Loading…</div>
-      ) : error ? (
-        <div>{error}</div>
-      ) : current ? (
-        <ArcGauge
-          value={current.primaryCurrent}
-          max={current.primaryTarget}
-          labelTop={current.primaryLabelTop}
-          centerMainParts={{
-            top: `${fmt(current.primaryCurrent)}`,
-            bottom: `${fmt(current.primaryTarget)}`
-          }}
-          centerSub={`${fmt(current.primaryTarget - current.primaryCurrent)} XP Left`}
-          centerHint={current.milestoneUnit === "kills" ? "To next milestone" : "To next level"}
-        />
-      ) : (
-        <div>No item</div>
-      )}
-    </section>
+        <main className="grid">
+          {/* LEFT ARC */}
+          <section className="card cardArc">
+            {loading ? (
+              <div>Loading…</div>
+            ) : error ? (
+              <div>{error}</div>
+            ) : current ? (
+              <ArcGauge
+                value={current.primaryCurrent}
+                max={current.primaryTarget}
+                labelTop={current.primaryLabelTop} // skills: "% Complete" | bosses/activities: "Next Milestone"
+                centerMainParts={{
+                  top: `${fmt(current.primaryCurrent)}`,
+                  bottom: `${fmt(current.primaryTarget)}`
+                }}
+                centerSub={primarySub} // skills: "XP Left" | bosses/activities: "Remaining"
+                centerHint={current.milestoneUnit === "kills" ? "To next milestone" : "To next level"}
+              />
+            ) : (
+              <div>No item</div>
+            )}
+          </section>
 
-    <section className="card cardArc">
-      {loading ? (
-        <div>Loading…</div>
-      ) : error ? (
-        <div>{error}</div>
-      ) : current ? (
-        current.secondaryType === "rank" ? (
-          <RankBadge
-            labelTop={current.secondaryLabelTop}
-            valueText={formatRank(current.secondaryCurrent ?? -1)}
-          />
-        ) : (
-          <ArcGauge
-            value={current.secondaryCurrent ?? 0}
-            max={current.secondaryTarget ?? 1}
-            labelTop={current.secondaryLabelTop}
-            centerMainParts={{
-              top: `${fmt(current.secondaryCurrent ?? 0)}`,
-              bottom: `${fmt(current.secondaryTarget ?? 1)}`
-            }}
-            centerSub={`${fmt((current.secondaryTarget ?? 0) - (current.secondaryCurrent ?? 0))} XP Left`}
-            centerHint="To 99"
-          />
-        )
-      ) : (
-        <div>No item</div>
+          {/* RIGHT ARC OR RANK */}
+          <section className="card cardArc">
+            {loading ? (
+              <div>Loading…</div>
+            ) : error ? (
+              <div>{error}</div>
+            ) : current ? (
+              current.secondaryType === "rank" ? (
+                <RankBadge
+                  labelTop={current.secondaryLabelTop}
+                  valueText={formatRank(current.secondaryCurrent ?? -1)}
+                />
+              ) : (
+                <ArcGauge
+                  value={current.secondaryCurrent ?? 0}
+                  max={current.secondaryTarget ?? 1}
+                  labelTop={current.secondaryLabelTop} // skills: "##% to 99"
+                  centerMainParts={{
+                    top: `${fmt(current.secondaryCurrent ?? 0)}`,
+                    bottom: `${fmt(current.secondaryTarget ?? 1)}`
+                  }}
+                  centerSub={`${fmt(
+                    Math.max(0, (current.secondaryTarget ?? 0) - (current.secondaryCurrent ?? 0))
+                  )} XP Left`}
+                  centerHint="To 99"
+                />
+              )
+            ) : (
+              <div>No item</div>
+            )}
+          </section>
+
+          {/* MILESTONES */}
+          <section className="card full cardTotal">
+            {current ? (
+              <MilestoneBar
+                title="Overall Milestones"
+                milestones={current.milestones}
+                current={current.milestoneCurrent}
+                unit={current.milestoneUnit}
+              />
+            ) : null}
+          </section>
+        </main>
       )}
-    </section>
-
-    <section className="card full cardTotal">
-      {current ? (
-        <MilestoneBar
-          title={current.milestoneUnit === "level" ? "Level Milestones" : "Killcount Milestones"}
-          milestones={current.milestones}
-          current={current.milestoneCurrent}
-          unit={current.milestoneUnit}
-        />
-      ) : null}
-    </section>
-  </main>
-)}
-
 
       {/* FOOTER */}
       <footer className="footer">
@@ -314,7 +326,6 @@ export default function App() {
           <button type="button" className={`tab ${category === "gim" ? "tabActive" : ""}`} onClick={() => setCategory("gim")}>
             GIM
           </button>
-
         </div>
 
         <div className="controls">
@@ -328,7 +339,7 @@ export default function App() {
                 return next;
               });
             }}
-            disabled={category === "total"}
+            disabled={category === "total" || category === "gim"}
           >
             {pinned || pinnedId ? "Pinned" : "Pin"}
           </button>
@@ -337,7 +348,7 @@ export default function App() {
             type="button"
             className="btn"
             onClick={() => setIndex((i) => Math.max(0, i - 1))}
-            disabled={filtered.length === 0 || category === "total"}
+            disabled={filtered.length === 0 || category === "total" || category === "gim"}
           >
             Prev
           </button>
@@ -346,7 +357,7 @@ export default function App() {
             type="button"
             className="btn"
             onClick={() => setIndex((i) => (filtered.length ? (i + 1) % filtered.length : 0))}
-            disabled={filtered.length === 0 || category === "total"}
+            disabled={filtered.length === 0 || category === "total" || category === "gim"}
           >
             Next
           </button>
@@ -358,7 +369,6 @@ export default function App() {
             onChange={(next) => setPlayer(next)}
             disabled={loading || refreshing}
           />
-
         </div>
       </footer>
 

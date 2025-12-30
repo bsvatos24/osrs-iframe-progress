@@ -92,7 +92,7 @@ export function mapHiscoresToDisplayItems(data: HiscoresResponse): DisplayItem[]
 
       primaryCurrent: inSeg,
       primaryTarget: span,
-      primaryLabelTop: `${pct.toFixed(0)}% Complete`,
+      primaryLabelTop: `Next Milestone: ${next}`,
       primaryLabelBottom: `${formatCompact(kills)} KC`,
 
       secondaryType: "rank",
