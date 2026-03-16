@@ -1,12 +1,5 @@
 {
   "name": "osrs-iframe-progress",
   "private": true,
-"version": "0.0.0",
-  "type": "module",
-   "scripts": {
-    "deploy": "gh-pages -d docs"
-  },
-  "devDependencies": {
-    "gh-pages": "^6.3.0"
-  }
+  "version": "0.0.0"
 }

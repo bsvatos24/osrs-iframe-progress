@@ -282,7 +282,7 @@ function renderHeader(current) {
     if (state.category === "total") {
       const img = document.createElement("img");
       img.className = "icon";
-      img.src = "icons/skills/total.png";
+      img.src = "wwwroot/icons/skills/total.png";
       img.alt = "Total";
       iconWrap.appendChild(img);
     } else if (current && current.iconUrl) {
@@ -822,7 +822,7 @@ function renderGimPanel(name, hiscores, ok) {
     const top = el("div", "gimSkillTop");
     const icon = document.createElement("img");
     icon.className = "gimSkillIcon";
-    icon.src = "icons/skills/" + slug(skill) + ".png";
+    icon.src = "wwwroot/icons/skills/" + slug(skill) + ".png";
     icon.alt = skill;
     top.appendChild(icon);
  

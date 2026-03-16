@@ -45,11 +45,11 @@ function slug(name) {
 }
  
 function iconForSkill(name) {
-  return "icons/skills/" + slug(name) + ".png";
+  return "wwwroot/icons/skills/" + slug(name) + ".png";
 }
  
 function iconForActivity(name) {
-  return "icons/activities/" + slug(name) + ".png";
+  return "wwwroot/icons/activities/" + slug(name) + ".png";
 }
  
 function fmt(n) {
