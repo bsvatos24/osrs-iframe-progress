@@ -10,25 +10,27 @@
   --shadow: 0 10px 25px rgba(0,0,0,0.55);
   --surface-grey: rgba(255,255,255,0.10);
   --surface-grey-border: rgba(255,255,255,0.22);
+  --gim-cell-min: 44px;
+  --gim-cell-gap: 6px;
 }
-
+ 
 /* Base */
-*{ 
-  box-sizing:border-box; 
+*{
+  box-sizing:border-box;
 }
-
-html, body, #root { 
+ 
+html, body, #app {
   height:100%;
   margin:0;
   overflow: hidden;
- }
-
+}
+ 
 body{
   background: var(--bg);
   color: var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
 }
-
+ 
 .app{
   height:100%;
   display:flex;
@@ -36,9 +38,9 @@ body{
   gap: 12px;
   padding: 14px;
   overflow: hidden;
-  min-height: 0; /* important for child overflow */
+  min-height: 0;
 }
-
+ 
 /* Header */
 .header{
   display:flex;
@@ -46,7 +48,7 @@ body{
   align-items:center;
   padding: 6px 0;
 }
-
+ 
 .headerCenter{
   display:flex;
   flex-direction:column;
@@ -58,52 +60,47 @@ body{
   padding: 10px 16px;
   box-shadow: var(--shadow);
   min-width: 260px;
+  position: relative;
 }
-
+ 
 .headerPlayer{
   font-size: 14px;
   font-weight: 700;
   color: var(--text);
   text-align: center;
 }
-
+ 
 .headerItemRow{
   display:flex;
   align-items:center;
   gap: 10px;
 }
-
+ 
 .iconWrap{
   width: 50px;
   height: 50px;
   border-radius: 999px;
-
   display:flex;
   align-items:center;
   justify-content:center;
-
-  /* subtle accent backing */
-  background: rgba(239,80,231); /* accent, translucent */
+  background: rgba(239,80,231);
   border: 1px solid rgba(239,80,231,0.45);
-
   box-shadow:
     0 0 0 2px rgba(239,80,231,0.15),
     inset 0 0 0 1px rgba(0,0,0,0.6);
-    
 }
-
+ 
 .icon{
   width: 34px;
   height: 34px;
 }
-
-
+ 
 .title{
   font-size: 16px;
   font-weight: 800;
   color: var(--text);
 }
-
+ 
 /* Grid */
 .grid{
   display:grid;
@@ -114,7 +111,7 @@ body{
   min-height: 0;
   overflow: hidden;
 }
-
+ 
 .card{
   background: var(--card);
   border: 1px solid var(--border);
@@ -125,7 +122,7 @@ body{
   align-items:center;
   justify-content:center;
 }
-
+ 
 .card.full{
   grid-column: 1 / span 2;
   align-items:stretch;
@@ -133,7 +130,7 @@ body{
   min-height: 0;
   overflow: hidden;
 }
-
+ 
 /* Gauge */
 .gauge{
   width: 100%;
@@ -142,32 +139,32 @@ body{
   align-items:center;
   gap: 8px;
 }
-
+ 
 .gaugeTop{
   font-size: 14px;
   font-weight: 700;
   color: var(--text);
   text-align:center;
 }
-
+ 
 .gaugeSvg{ display:block; }
-
+ 
 .gaugeTrack{
   stroke: rgba(255,255,255,0.16);
   stroke-linecap: round;
 }
-
+ 
 .gaugeFill{
   stroke: var(--accent);
   stroke-linecap: round;
 }
-
+ 
 .gaugeTextMain{
   fill: var(--text);
   font-size: 22px;
   font-weight: 800;
 }
-
+ 
 .gaugeTextFracBar{
   fill: var(--accent);
   font-size: 12px;
@@ -175,25 +172,25 @@ body{
   letter-spacing: 0.03em;
   opacity: 0.85;
 }
-
+ 
 .gaugeTextSub{
   fill: var(--text);
   font-size: 18px;
   font-weight: 700;
   opacity: 0.9;
 }
-
+ 
 .gaugeTextHint{
   fill: var(--muted);
   font-size: 14px;
   font-weight: 600;
 }
-
+ 
 .gaugeFracLine{
   stroke: var(--accent);
   opacity: 0.9;
 }
-
+ 
 /* Rank */
 .rankWrap{
   width:100%;
@@ -202,7 +199,7 @@ body{
   align-items:center;
   gap: 10px;
 }
-
+ 
 .rankCircle{
   width: 150px;
   height: 150px;
@@ -213,12 +210,12 @@ body{
   justify-content:center;
   background: rgba(0,0,0,0.18);
 }
-
+ 
 .rankValue{
   font-size: 22px;
   font-weight: 800;
 }
-
+ 
 /* Milestones */
 .milestones{
   width: 100%;
@@ -226,14 +223,14 @@ body{
   flex-direction:column;
   min-height: 0;
 }
-
+ 
 .milestoneTitle{
   width: 100%;
   text-align:center;
   font-weight: 700;
   margin-bottom: 10px;
 }
-
+ 
 .milestoneRow{
   width: 100%;
   display:flex;
@@ -242,7 +239,7 @@ body{
   overflow-x:auto;
   padding-bottom: 6px;
 }
-
+ 
 .customScroll::-webkit-scrollbar{ height: 8px; }
 .customScroll::-webkit-scrollbar-thumb{
   background: rgba(255,255,255,0.16);
@@ -252,7 +249,7 @@ body{
   background: rgba(255,255,255,0.06);
   border-radius: 999px;
 }
-
+ 
 .bubble{
   z-index: 1;
   height: 44px;
@@ -262,40 +259,35 @@ body{
   display:flex;
   align-items:center;
   justify-content:center;
-
   border: 1px solid rgba(255,255,255,0.18);
   background: rgba(0,0,0,0.22);
   box-shadow: var(--shadow);
-
   font-size: 12px;
   -webkit-user-select: none;
   user-select:none;
-
   transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease, color 140ms ease;
 }
-
+ 
 .bubble.dim{ color: var(--dim); }
-
-/* completed milestone bubble = accent highlight */
+ 
 .bubble.bright{
   color: var(--text);
-  border-color: rgba(239,80,231,0.85);                 /* accent border */
-  background: rgba(239,80,231,0.12);                   /* subtle accent fill */
+  border-color: rgba(239,80,231,0.85);
+  background: rgba(239,80,231,0.12);
   box-shadow:
     0 0 0 2px rgba(239,80,231,0.15),
-    0 10px 25px rgba(0,0,0,0.55);                      /* keep your base shadow */
+    0 10px 25px rgba(0,0,0,0.55);
 }
-
-
+ 
 .segWrap{
   display:flex;
   align-items:center;
-  flex: 1 1 0;     /* segments expand */
-  min-width: 0;    /* prevents overflow weirdness */
+  flex: 1 1 0;
+  min-width: 0;
 }
-
+ 
 .segTrack{
-  flex: 1 1 auto;  /* track grows */
+  flex: 1 1 auto;
   height: 12px;
   min-width: 48px;
   margin-left: -6px;
@@ -308,14 +300,14 @@ body{
   overflow:hidden;
   border-radius: 999px;
 }
-
+ 
 .segFill{
   height: 100%;
   background: var(--accent);
   border-top: 4px solid rgba(0,0,0,0.45);
   border-bottom: 4px solid rgba(0,0,0,0.45);
 }
-
+ 
 /* Footer */
 .footer{
   display:flex;
@@ -328,9 +320,9 @@ body{
   padding: 10px;
   box-shadow: var(--shadow);
 }
-
+ 
 .tabs{ display:flex; gap: 8px; }
-
+ 
 .tab{
   padding: 8px 12px;
   border-radius: 999px;
@@ -339,19 +331,18 @@ body{
   color: var(--muted);
   cursor:pointer;
 }
-
+ 
 .tabActive{
   background: rgba(255,255,255,0.12);
   color: var(--text);
 }
-
+ 
 .controls{
   display:flex;
   gap: 8px;
   align-items:center;
 }
-
-/* Buttons: grey for now */
+ 
 .btn{
   padding: 8px 10px;
   border-radius: 12px;
@@ -360,16 +351,16 @@ body{
   color: var(--text);
   cursor:pointer;
 }
-
+ 
 .btn:disabled{
   opacity: 0.5;
   cursor: not-allowed;
 }
-
+ 
 .btnPin{
   border-color: rgba(255,255,255,0.35);
 }
-
+ 
 /* Modal + Inputs */
 .modalOverlay{
   position:fixed;
@@ -381,7 +372,7 @@ body{
   padding: 16px;
   z-index: 9999;
 }
-
+ 
 .modal{
   width: min(720px, 100%);
   max-height: min(80vh, 700px);
@@ -396,19 +387,19 @@ body{
   gap: 10px;
   z-index: 10000;
 }
-
+ 
 .modalHeader{
   display:flex;
   justify-content:space-between;
   align-items:center;
   gap: 10px;
 }
-
+ 
 .modalTitle{
   font-size: 14px;
   font-weight: 800;
 }
-
+ 
 .input{
   width: 100%;
   padding: 10px 12px;
@@ -417,7 +408,7 @@ body{
   background: rgba(255,255,255,0.06);
   color: var(--text);
 }
-
+ 
 .select{
   width: 180px;
   padding: 10px 12px;
@@ -426,8 +417,7 @@ body{
   background: rgba(255,255,255,0.06);
   color: var(--text);
 }
-
-/* Helps the CLOSED select match your theme (already good) */
+ 
 select.input{
   appearance: none;
   -webkit-appearance: none;
@@ -435,17 +425,17 @@ select.input{
   color: var(--text);
   border: 1px solid rgba(255,255,255,0.22);
 }
-
-/* Some browsers honor these, some ignore them */
+ 
 select.input option{
   background: #111 !important;
   color: #fff !important;
 }
+ 
 select.input optgroup{
   background: #111 !important;
   color: #fff !important;
 }
-
+ 
 .list{
   overflow:auto;
   display:flex;
@@ -453,7 +443,7 @@ select.input optgroup{
   gap: 8px;
   padding-right: 6px;
 }
-
+ 
 .listRow{
   display:flex;
   justify-content:space-between;
@@ -464,7 +454,7 @@ select.input optgroup{
   padding: 10px;
   background: rgba(255,255,255,0.03);
 }
-
+ 
 .listMain{
   display:flex;
   align-items:center;
@@ -475,11 +465,9 @@ select.input optgroup{
   cursor:pointer;
   font-weight: 700;
 }
-
+ 
 .listIcon{ width: 22px; height: 22px; }
-
-.headerCenter{ position: relative; }
-
+ 
 .headerActions{
   position: absolute;
   top: 8px;
@@ -487,7 +475,7 @@ select.input optgroup{
   display: flex;
   gap: 8px;
 }
-
+ 
 .iconBtn{
   width: 34px;
   height: 34px;
@@ -500,43 +488,39 @@ select.input optgroup{
   justify-content:center;
   cursor:pointer;
 }
-
+ 
 .iconBtn:disabled{ opacity: 0.5; cursor: not-allowed; }
-
+ 
 .spin{ animation: spin 0.9s linear infinite; }
-@keyframes spin { 
-  from { transform: rotate(0deg); } 
-  to { transform: rotate(360deg); } 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
-
-
-
+ 
 .iconBtn:hover{
   background: rgba(255,255,255,0.14);
 }
-
+ 
 .iconBtn:active{
   transform: translateY(1px);
 }
-
-/* Make sure SVG icon uses currentColor */
+ 
 .iconBtn svg{
   width: 22px;
   height: 22px;
   fill: currentColor;
 }
-
+ 
 /* Picker grid */
 .pickerGrid{
-  display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 3 columns */
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  overflow: auto;
+  overflow:auto;
   padding-right: 6px;
   min-height: 0;
 }
-
-/* Each tile button */
+ 
 .pickerTile{
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.14);
@@ -544,56 +528,43 @@ select.input optgroup{
   color: var(--text);
   padding: 10px;
   cursor: pointer;
-
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
-
   transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
 }
-
+ 
 .pickerTile:hover{
   background: rgba(255,255,255,0.10);
   border-color: rgba(255,255,255,0.22);
   transform: translateY(-1px);
 }
-
+ 
 .pickerTilePinned{
   border-color: rgba(239,80,231,0.85);
   box-shadow: 0 0 0 2px rgba(239,80,231,0.15);
 }
-
-/* Icon + name */
+ 
 .pickerTileIcon{
   width: 34px;
   height: 34px;
   object-fit: contain;
 }
-
+ 
 .pickerTileName{
   font-size: 12px;
   font-weight: 700;
   text-align: center;
   line-height: 1.1;
   opacity: 0.95;
-
-  /* prevent super long names from wrecking grid */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
-.pickerGrid{
-  display:grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  overflow:auto;
-  padding-right: 6px;
-}
-
+ 
 .pickerCell{
   border: 1px solid rgba(255,255,255,0.14);
   background: rgba(255,255,255,0.04);
@@ -604,43 +575,43 @@ select.input optgroup{
   text-align:center;
   box-shadow: var(--shadow);
 }
-
+ 
 .pickerCellPinned{
   border-color: rgba(239,80,231,0.85);
   box-shadow: 0 0 0 2px rgba(239,80,231,0.15), var(--shadow);
 }
-
+ 
 .pickerIcon{
   width: 32px;
   height: 32px;
   display:block;
   margin: 0 auto 8px auto;
 }
-
+ 
 .pickerName{
   font-size: 12px;
   font-weight: 800;
   line-height: 1.1;
   margin-bottom: 8px;
 }
-
+ 
 .pickerPinRow{
   display:flex;
   justify-content:center;
   align-items:center;
   gap: 8px;
 }
-
+ 
 .pickerPinText{
   font-size: 11px;
   color: var(--muted);
 }
-
+ 
 .btnMini{
   padding: 6px 8px;
   border-radius: 10px;
 }
-
+ 
 .totalWrap{
   width: 100%;
   display:flex;
@@ -648,14 +619,14 @@ select.input optgroup{
   gap: 12px;
   min-height: 0;
 }
-
+ 
 .totalGrid{
   display:grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   width: 100%;
 }
-
+ 
 .skillTile{
   border: var(--surface-grey-border);
   background: var(--surface-grey);
@@ -667,26 +638,26 @@ select.input optgroup{
   justify-content:space-between;
   min-height: 74px;
 }
-
+ 
 .skillTileTop{
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap: 10px;
 }
-
+ 
 .skillTileIcon{
   width: 28px;
   height: 28px;
   display:block;
 }
-
+ 
 .skillTileLevel{
   font-size: 18px;
   font-weight: 900;
   color: var(--text);
 }
-
+ 
 .skillTileBar{
   height: 6px;
   border-radius: 999px;
@@ -695,13 +666,13 @@ select.input optgroup{
   border: 1px solid rgba(255,255,255,0.10);
   margin-top: 8px;
 }
-
+ 
 .skillTileBarFill{
   height: 100%;
   width: 0%;
   border-radius: 999px;
 }
-
+ 
 .totalFooter{
   display:flex;
   justify-content:space-between;
@@ -709,25 +680,25 @@ select.input optgroup{
   padding-top: 4px;
   border-top: 1px solid rgba(255,255,255,0.10);
 }
-
+ 
 .totalFooterStat{
   display:flex;
   flex-direction:column;
   gap: 4px;
 }
-
+ 
 .totalFooterLabel{
   font-size: 12px;
   color: var(--muted);
   font-weight: 700;
 }
-
+ 
 .totalFooterValue{
   font-size: 16px;
   font-weight: 900;
   color: var(--text);
 }
-
+ 
 .skillTileName{
   flex: 1;
   text-align: center;
@@ -739,7 +710,7 @@ select.input optgroup{
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
+ 
 /* GIM panel styling */
 .gimPanel{
   width:100%;
@@ -753,15 +724,14 @@ select.input optgroup{
   flex-direction:column;
   gap: 8px;
 }
-
+ 
 .gimPanelHeader{
   display: grid;
-  grid-template-columns: 1fr auto 1fr; /* left spacer | name | right area */
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 10px;
 }
-
-/* force the name to the true center */
+ 
 .gimPanelName{
   grid-column: 2;
   justify-self: center;
@@ -769,12 +739,10 @@ select.input optgroup{
   font-size: 14px;
   color: var(--text);
 }
-
-/* tag stays on the right, but doesn't move the name */
+ 
 .gimPanelTag{
   grid-column: 3;
   justify-self: end;
-
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 999px;
@@ -782,19 +750,13 @@ select.input optgroup{
   background: rgba(255,255,255,0.06);
   color: var(--muted);
 }
-
-
-:root{
-  --gim-cell-min: 44px;  /* <-- TUNE THIS (try 40, 38, 36 if you need tighter) */
-  --gim-cell-gap: 6px;   /* <-- gap between skill cells */
-}
-
+ 
 .mainFill{
   flex: 1;
-  min-height: 0; /* important so inner scroll areas work */
+  min-height: 0;
   display:flex;
 }
-
+ 
 .gimSkillsGrid{
   display:grid;
   grid-template-columns: repeat(var(--gim-cols, 8), minmax(0, 1fr));
@@ -802,52 +764,48 @@ select.input optgroup{
   overflow: auto;
   padding-right: 4px;
 }
-
-/* Smaller skill cells */
+ 
 .gimSkillCell{
   border: var(--surface-grey-border);
   background: var(--surface-grey);
   border-radius: 5px;
-
-  padding: 3px;         /* <-- also affects size */
+  padding: 3px;
   display:flex;
   flex-direction:column;
   gap: 3px;
 }
-
-/* icon + level */
+ 
 .gimSkillTop{
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap: 6px;
 }
-
+ 
 .gimSkillIcon{
-  width: 18px;          /* <-- icon size knob */
+  width: 18px;
   height: 18px;
 }
-
+ 
 .gimSkillLvl{
   color: var(--text);
   font-weight: 900;
-  font-size: 12px;      /* <-- level text knob */
+  font-size: 12px;
   line-height: 1;
 }
-
-/* progress bar */
+ 
 .gimSkillBarTrack{
-  height: 5px;          /* <-- bar thickness knob */
+  height: 5px;
   border-radius: 999px;
   background: rgba(255,255,255,0.10);
   overflow:hidden;
 }
-
+ 
 .gimSkillBarFill{
   height: 100%;
   border-radius: 999px;
 }
-
+ 
 .gimTotals{
   display:flex;
   justify-content:space-between;
@@ -857,27 +815,27 @@ select.input optgroup{
   color: var(--muted);
   font-weight: 700;
 }
-
+ 
 .gimTotals span{
   color: var(--text);
   font-weight: 900;
 }
-
+ 
 /* GIM layout (die-5 pattern) */
 .gimLayout{
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 100px; /* adjust for your screen */
+  min-height: 100px;
 }
-
+ 
 .gimSlot{
   position: absolute;
   width: 33%;
   height: 50%;
   min-width: 260px;
 }
-
+ 
 .gimSlot.tl{ top: 0; left: 0; }
 .gimSlot.tr{ top: 0; right: 0; }
 .gimSlot.bl{ bottom: 0; left: 0; }
@@ -889,12 +847,12 @@ select.input optgroup{
   width: 33%;
   height: 50%;
 }
-
+ 
 /* Player menu (custom dropdown) */
 .playerMenu{
   position: relative;
 }
-
+ 
 .playerMenuBtn{
   display:flex;
   align-items:center;
@@ -902,12 +860,12 @@ select.input optgroup{
   min-width: 180px;
   justify-content:space-between;
 }
-
+ 
 .playerMenuValue{
   font-weight: 700;
   letter-spacing: .02em;
 }
-
+ 
 .playerMenuChevron{
   opacity: 0.85;
   transform: translateY(-1px);
@@ -916,24 +874,22 @@ select.input optgroup{
 .playerMenuChevron.open{
   transform: rotate(180deg) translateY(1px);
 }
-
+ 
 .playerMenuPanel{
   position: absolute;
   right: 0;
-  bottom: calc(100% + 8px); /* opens upward from footer */
+  bottom: calc(100% + 8px);
   width: 220px;
   z-index: 9999;
-
   border: 1px solid rgba(255,255,255,0.22);
   background: rgba(0,0,0,0.95);
   border-radius: 14px;
   box-shadow: var(--shadow);
-
   display:flex;
   flex-direction:column;
   padding: 6px;
 }
-
+ 
 .playerMenuItem{
   width: 100%;
   text-align:left;
@@ -945,16 +901,16 @@ select.input optgroup{
   cursor: pointer;
   font-weight: 700;
 }
-
+ 
 .playerMenuItem:hover{
   background: rgba(255,255,255,0.10);
 }
-
+ 
 .playerMenuItem.active{
   background: rgba(255,255,255,0.14);
   outline: 1px solid rgba(255,255,255,0.18);
 }
-
+ 
 .headerGimOnly{
   font-size: 16px;
   font-weight: 800;
@@ -962,42 +918,41 @@ select.input optgroup{
   text-align: center;
   padding: 2px 6px;
 }
-
-/* shrink the headerCenter padding specifically on the gim header if you want */
+ 
 .headerCenter:has(.headerGimOnly){
   padding: 6px 12px;
   gap: 0;
 }
-
+ 
 .cardTotal{
   display:flex;
   flex-direction:column;
   min-height:0;
   overflow:hidden;
 }
-
-/* the TotalGrid root wrapper should fill and scroll */
+ 
 .totalGridWrap{
   flex: 1;
   min-height: 0;
-  overflow: auto;  /* ✅ scroll inside the card, not the page */
+  overflow: auto;
 }
-
+ 
 /* Subtle scrollbar for dark UI */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
+ 
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
+ 
 ::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.15);
   border-radius: 999px;
 }
-
+ 
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.30);
 }
+
