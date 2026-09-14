@@ -113,8 +113,13 @@
 
 /* --- Gauges ---------------------------------------------------------- */
 
+.cardArc{
+  align-items: stretch;
+}
+
 .gauge{
   width: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -128,14 +133,16 @@
   text-align: center;
 }
 
-/* The SVG uses a viewBox, so it scales to whatever the card gives it rather
-   than being pinned to the old hard-coded 200px. */
+/* The SVG uses a square viewBox and the default preserveAspectRatio
+   (xMidYMid meet), so letting its box fill the card makes the arc render at
+   the card's smaller dimension, centred - no aspect-ratio arithmetic and no
+   hard-coded 200px. Setting max-width instead would let the ratio force a
+   height taller than the card and overflow it. */
 .gaugeSvg{
   display: block;
   width: 100%;
   min-height: 0;
-  max-width: 260px;
-  flex: 1;
+  flex: 1 1 0;
 }
 
 .gaugeTrack{

@@ -34,6 +34,10 @@ export const TEAM = [
   { name: "PacmanPier", pos: "br" }
 ];
 
+// Die-5 slot order, assigned to the roster in order. Kept separate from TEAM
+// so an arbitrary ?players= list still gets sensible positions.
+export const GIM_POSITIONS = ["c", "tl", "tr", "bl", "br"];
+
 export const DEFAULT_PLAYER = (TEAM.find(function (m) { return m.owner; }) || TEAM[0]).name;
 export const PLAYER_OPTIONS = TEAM.map(function (m) { return m.name; });
 

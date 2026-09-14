@@ -7,20 +7,25 @@
 // ============================================================
 
 import { loadPlayer, loadPlayers } from "./api.js";
-import {
-  CATEGORIES, ITEM_CATEGORIES, PLAYER_OPTIONS, SKILL_GRID_ORDER, TEAM
-} from "./constants.js";
+import { applyConfigToDocument, config } from "./config.js";
+import { CATEGORIES, GIM_POSITIONS, ITEM_CATEGORIES, SKILL_GRID_ORDER } from "./constants.js";
 import { gridIcon, iconButton, refreshIcon } from "./components.js";
 import { button, el, img, replaceChildren } from "./dom.js";
-import { formatClock } from "./format.js";
+import { formatClock, slug } from "./format.js";
 import { mapHiscoresToDisplayItems } from "./model.js";
+import { getBucket, observeBucket, onBucketChange } from "./mode.js";
 import { invalidate, flush, setPainter, state } from "./store.js";
 import { renderGimView } from "./views/gim.js";
 import { renderItemView } from "./views/item.js";
 import { renderTotalView } from "./views/total.js";
 
-const CYCLE_INTERVAL_MS = 6000;
-const REFRESH_INTERVAL_MS = 300000; // 5 minutes
+const CYCLE_INTERVAL_MS = config.cycleMs;
+const REFRESH_INTERVAL_MS = config.refreshMs;
+
+// The GIM roster: config.players in order, each given a die-5 slot.
+const ROSTER = config.players.map(function (name, i) {
+  return { name: name, pos: GIM_POSITIONS[i % GIM_POSITIONS.length] };
+});
 
 let cycleTimer = null;
 let pollTimer = null;
@@ -39,6 +44,11 @@ const shell = {
 // --- Bootstrap -------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", function () {
+  applyConfigToDocument();
+
+  state.player = config.player;
+  state.category = config.view;
+
   shell.root = document.getElementById("app");
   shell.root.className = "app";
   shell.root.append(shell.header, shell.main, shell.footer);
@@ -46,14 +56,24 @@ document.addEventListener("DOMContentLoaded", function () {
   shell.picker = buildPickerDialog();
   document.body.appendChild(shell.picker.dialog);
 
+  // Resolve the bucket before the first paint so views never render into the
+  // wrong layout and immediately reflow.
+  observeBucket(shell.root);
+  onBucketChange(function () {
+    invalidate("main");
+    startCycleTimer(); // a bucket change can start or stop GIM member cycling
+  });
+
   setPainter(paint);
   loadData();
+  if (state.category === "gim") loadGimData();
   // loadData() only marks header+main dirty; the first paint must cover the
   // whole shell or the footer never gets built.
   invalidate();
   flush();
 
   setupGlobalKeys();
+  setupTouchGestures();
   setupVisibilityHandling();
   startPollTimer();
 });
@@ -65,17 +85,22 @@ function paint(dirty) {
   if (current) state.lastSelectedId = current.id;
 
   if (dirty.has("header")) {
-    replaceChildren(shell.header, buildHeaderCenter(current), buildHeaderActions());
+    replaceChildren(shell.header, buildHeaderCenter(current),
+      config.chrome ? buildHeaderActions() : null);
   }
   if (dirty.has("main")) paintMain(current);
-  if (dirty.has("footer")) replaceChildren(shell.footer, buildTabs(), buildControls());
+  if (dirty.has("footer")) {
+    if (config.chrome) replaceChildren(shell.footer, buildTabs(), buildControls());
+    else replaceChildren(shell.footer);
+  }
   if (dirty.has("overlay")) paintPicker();
 }
 
 function paintMain(current) {
-  const view = state.category === "gim" ? renderGimView(state)
+  const bucket = getBucket();
+  const view = state.category === "gim" ? renderGimView(state, bucket, ROSTER)
     : state.category === "total" ? renderTotalView(state)
-    : renderItemView(Object.assign({ current: current }, state));
+    : renderItemView(Object.assign({ current: current, bucket: bucket }, state));
 
   shell.main.className = view.className;
   replaceChildren(shell.main, ...view.children);
@@ -99,6 +124,7 @@ function loadData() {
       if (!result.data) return;
 
       state.items = mapHiscoresToDisplayItems(result.data);
+      applyItemSlug();
       preserveSelection();
     })
     .catch(function (e) {
@@ -111,6 +137,17 @@ function loadData() {
       invalidate();
       startCycleTimer();
     });
+}
+
+// ?item=slayer locks a widget slot onto one entry. Ids come from the hiscores
+// payload, so the slug can only be resolved once data has arrived.
+function applyItemSlug() {
+  if (!config.itemSlug || state.pinnedId) return;
+  const match = state.items.find(function (i) { return slug(i.name) === config.itemSlug; });
+  if (!match) return;
+  state.category = match.category;
+  state.pinnedId = match.id;
+  state.pinned = true;
 }
 
 // Keep the user (or the widget's configured item) on the same entry across a
@@ -136,7 +173,7 @@ function loadGimData() {
   state.gim.loading = true;
   invalidate("main");
 
-  loadPlayers(TEAM.map(function (m) { return m.name; }), gimAbortController.signal)
+  loadPlayers(ROSTER.map(function (m) { return m.name; }), gimAbortController.signal)
     .then(function (results) {
       state.gim.results = results;
       state.gim.loaded = true;
@@ -148,6 +185,7 @@ function loadGimData() {
     .finally(function () {
       state.gim.loading = false;
       invalidate("main");
+      startCycleTimer();
     });
 }
 
@@ -179,13 +217,25 @@ function getPickerItems() {
 
 function startCycleTimer() {
   stopCycleTimer();
+  if (document.hidden || CYCLE_INTERVAL_MS <= 0) return;
+
+  // The single-panel GIM layout (narrow slots) cycles through members instead
+  // of through items.
+  if (state.category === "gim") {
+    if (!gimCycles()) return;
+    cycleTimer = setInterval(function () {
+      state.gim.cycleIndex = (state.gim.cycleIndex + 1) % Math.max(1, ROSTER.length);
+      invalidate("main");
+    }, CYCLE_INTERVAL_MS);
+    return;
+  }
+
   if (!ITEM_CATEGORIES.has(state.category)) return;
   if (state.pinned || state.pinnedId) return;
   // The picker used to be rebuilt by every repaint, so cycling while it was
   // open wiped the search box mid-typing. It now lives outside #app, but there
   // is still no reason to shuffle the view behind an open dialog.
   if (state.pickerOpen) return;
-  if (document.hidden || CYCLE_INTERVAL_MS <= 0) return;
   if (getFiltered().length <= 1) return;
 
   cycleTimer = setInterval(function () {
@@ -199,6 +249,11 @@ function startCycleTimer() {
 function stopCycleTimer() {
   if (cycleTimer) clearInterval(cycleTimer);
   cycleTimer = null;
+}
+
+function gimCycles() {
+  if (config.gimStyle) return config.gimStyle === "cycle";
+  return getBucket() === "m";
 }
 
 // An always-on display that only fetches at startup shows whatever the XP was
@@ -393,7 +448,7 @@ function buildPlayerMenu() {
 
     const panel = el("div", "playerMenuPanel");
     panel.setAttribute("role", "listbox");
-    PLAYER_OPTIONS.forEach(function (name) {
+    config.players.forEach(function (name) {
       const active = name === state.player;
       const item = button("playerMenuItem" + (active ? " active" : ""), name, function () {
         onPlayerChange(name);
@@ -553,6 +608,50 @@ function paintPickerGrid(container, query) {
     return;
   }
   replaceChildren(container, ...cells);
+}
+
+// --- Touch -----------------------------------------------------------------
+// Swipe horizontally to change item, vertically to change tab. The Edge is a
+// five-point touch panel and was previously driven only by small buttons.
+
+const SWIPE_MIN_PX = 48;
+const SWIPE_MAX_MS = 700;
+
+function setupTouchGestures() {
+  let start = null;
+
+  shell.root.addEventListener("pointerdown", function (e) {
+    if (e.pointerType === "mouse") return;
+    // Let controls handle their own taps.
+    if (e.target.closest("button, input, .playerMenu")) return;
+    start = { x: e.clientX, y: e.clientY, t: Date.now() };
+  });
+
+  shell.root.addEventListener("pointerup", function (e) {
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    const elapsed = Date.now() - start.t;
+    start = null;
+
+    if (elapsed > SWIPE_MAX_MS) return;
+
+    if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) onNext(); else onPrev();
+      return;
+    }
+    if (Math.abs(dy) >= SWIPE_MIN_PX && Math.abs(dy) > Math.abs(dx)) {
+      stepCategory(dy < 0 ? 1 : -1);
+    }
+  });
+
+  shell.root.addEventListener("pointercancel", function () { start = null; });
+}
+
+function stepCategory(delta) {
+  const idx = CATEGORIES.findIndex(function (c) { return c.id === state.category; });
+  const next = CATEGORIES[(idx + delta + CATEGORIES.length) % CATEGORIES.length];
+  setCategory(next.id);
 }
 
 // --- Keyboard --------------------------------------------------------------

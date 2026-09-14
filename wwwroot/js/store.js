@@ -29,7 +29,7 @@ export const state = {
 
   // GIM results live here, not in the DOM. Any render used to replace the GIM
   // panels with a placeholder that nothing resolved.
-  gim: { results: [], loading: false, loaded: false }
+  gim: { results: [], loading: false, loaded: false, cycleIndex: 0 }
 };
 
 export const REGIONS = ["header", "main", "footer", "overlay"];
