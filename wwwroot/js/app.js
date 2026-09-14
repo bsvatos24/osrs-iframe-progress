@@ -1,67 +1,225 @@
 // ============================================================
-// OSRS Dashboard — Vanilla JS App
+// OSRS Progress Dashboard - shell, wiring and timers.
+//
+// The shell (header / main / footer) is built once. Actions mark regions dirty
+// and a single batched frame repaints only those. The picker lives in a
+// <dialog> outside #app, so app repaints can never destroy its input.
 // ============================================================
- 
-// --- State ---
-let state = {
-  player: DEFAULT_PLAYER,
-  items: [],
-  category: "skills",
-  index: 0,
-  pinned: false,
-  pinnedId: null,
-  pickerOpen: false,
-  loading: true,
-  refreshing: false,
-  error: null,
-  lastSelectedId: null,
-  // Freshness of the current player's data, so the UI can admit to being stale
-  // instead of silently showing hours-old numbers as if they were live.
-  fetchedAt: null,
-  stale: false,
-  // GIM results live in state, not in the DOM. Previously any render() while
-  // on the GIM tab replaced the panels with a "Loading GIM..." placeholder
-  // that nothing ever resolved, blanking the tab until you switched away.
-  gim: { results: [], loading: false, loaded: false }
-};
- 
+
+import { loadPlayer, loadPlayers } from "./api.js";
+import {
+  CATEGORIES, ITEM_CATEGORIES, PLAYER_OPTIONS, SKILL_GRID_ORDER, TEAM
+} from "./constants.js";
+import { gridIcon, iconButton, refreshIcon } from "./components.js";
+import { button, el, img, replaceChildren } from "./dom.js";
+import { formatClock } from "./format.js";
+import { mapHiscoresToDisplayItems } from "./model.js";
+import { invalidate, flush, setPainter, state } from "./store.js";
+import { renderGimView } from "./views/gim.js";
+import { renderItemView } from "./views/item.js";
+import { renderTotalView } from "./views/total.js";
+
+const CYCLE_INTERVAL_MS = 6000;
+const REFRESH_INTERVAL_MS = 300000; // 5 minutes
+
 let cycleTimer = null;
 let pollTimer = null;
 let abortController = null;
 let gimAbortController = null;
- 
-// --- DOM references (set in init) ---
-let $app;
- 
-// --- Init ---
+
+// Persistent shell nodes.
+const shell = {
+  root: null,
+  header: el("header", "header"),
+  main: el("main", "grid"),
+  footer: el("footer", "footer"),
+  picker: null
+};
+
+// --- Bootstrap -------------------------------------------------------------
+
 document.addEventListener("DOMContentLoaded", function () {
-  $app = document.getElementById("app");
+  shell.root = document.getElementById("app");
+  shell.root.className = "app";
+  shell.root.append(shell.header, shell.main, shell.footer);
+
+  shell.picker = buildPickerDialog();
+  document.body.appendChild(shell.picker.dialog);
+
+  setPainter(paint);
   loadData();
-  render();
-  setupOutsideClickHandlers();
+  // loadData() only marks header+main dirty; the first paint must cover the
+  // whole shell or the footer never gets built.
+  invalidate();
+  flush();
+
+  setupGlobalKeys();
   setupVisibilityHandling();
   startPollTimer();
 });
 
-// --- Polling ---
+// --- Painting --------------------------------------------------------------
+
+function paint(dirty) {
+  const current = getCurrent();
+  if (current) state.lastSelectedId = current.id;
+
+  if (dirty.has("header")) {
+    replaceChildren(shell.header, buildHeaderCenter(current), buildHeaderActions());
+  }
+  if (dirty.has("main")) paintMain(current);
+  if (dirty.has("footer")) replaceChildren(shell.footer, buildTabs(), buildControls());
+  if (dirty.has("overlay")) paintPicker();
+}
+
+function paintMain(current) {
+  const view = state.category === "gim" ? renderGimView(state)
+    : state.category === "total" ? renderTotalView(state)
+    : renderItemView(Object.assign({ current: current }, state));
+
+  shell.main.className = view.className;
+  replaceChildren(shell.main, ...view.children);
+}
+
+// --- Data ------------------------------------------------------------------
+
+function loadData() {
+  if (abortController) abortController.abort();
+  abortController = new AbortController();
+
+  state.error = null;
+  if (state.items.length === 0) state.loading = true;
+  invalidate("header", "main");
+
+  loadPlayer(state.player, abortController.signal)
+    .then(function (result) {
+      state.fetchedAt = result.fetchedAt;
+      state.stale = result.stale;
+      state.error = result.data ? null : result.error;
+      if (!result.data) return;
+
+      state.items = mapHiscoresToDisplayItems(result.data);
+      preserveSelection();
+    })
+    .catch(function (e) {
+      if (isAbort(e)) return;
+      state.error = e.message || "Unknown error";
+    })
+    .finally(function () {
+      state.loading = false;
+      state.refreshing = false;
+      invalidate();
+      startCycleTimer();
+    });
+}
+
+// Keep the user (or the widget's configured item) on the same entry across a
+// refresh, rather than snapping back to index 0.
+function preserveSelection() {
+  if (!ITEM_CATEGORIES.has(state.category)) return;
+
+  const filtered = getFiltered();
+  const desiredId = state.pinnedId || state.lastSelectedId;
+
+  if (desiredId) {
+    const idx = filtered.findIndex(function (x) { return x.id === desiredId; });
+    state.index = idx >= 0 ? idx : 0;
+    return;
+  }
+  state.index = filtered.length > 0 ? Math.min(state.index, filtered.length - 1) : 0;
+}
+
+function loadGimData() {
+  if (gimAbortController) gimAbortController.abort();
+  gimAbortController = new AbortController();
+
+  state.gim.loading = true;
+  invalidate("main");
+
+  loadPlayers(TEAM.map(function (m) { return m.name; }), gimAbortController.signal)
+    .then(function (results) {
+      state.gim.results = results;
+      state.gim.loaded = true;
+    })
+    .catch(function (e) {
+      if (isAbort(e)) return;
+      state.gim.results = [];
+    })
+    .finally(function () {
+      state.gim.loading = false;
+      invalidate("main");
+    });
+}
+
+function isAbort(err) {
+  return err && (err.name === "AbortError" || err.name === "TimeoutError");
+}
+
+// --- Selection helpers -----------------------------------------------------
+
+function getFiltered() {
+  if (!ITEM_CATEGORIES.has(state.category)) return [];
+  return state.items.filter(function (i) { return i.category === state.category; });
+}
+
+function getCurrent() {
+  return getFiltered()[state.index] || null;
+}
+
+function getPickerItems() {
+  const filtered = getFiltered();
+  if (state.category === "skills") {
+    const byName = new Map(filtered.map(function (s) { return [s.name, s]; }));
+    return SKILL_GRID_ORDER.map(function (n) { return byName.get(n); }).filter(Boolean);
+  }
+  return filtered.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+}
+
+// --- Timers ----------------------------------------------------------------
+
+function startCycleTimer() {
+  stopCycleTimer();
+  if (!ITEM_CATEGORIES.has(state.category)) return;
+  if (state.pinned || state.pinnedId) return;
+  // The picker used to be rebuilt by every repaint, so cycling while it was
+  // open wiped the search box mid-typing. It now lives outside #app, but there
+  // is still no reason to shuffle the view behind an open dialog.
+  if (state.pickerOpen) return;
+  if (document.hidden || CYCLE_INTERVAL_MS <= 0) return;
+  if (getFiltered().length <= 1) return;
+
+  cycleTimer = setInterval(function () {
+    const count = getFiltered().length;
+    if (count === 0) return;
+    state.index = (state.index + 1) % count;
+    invalidate("header", "main");
+  }, CYCLE_INTERVAL_MS);
+}
+
+function stopCycleTimer() {
+  if (cycleTimer) clearInterval(cycleTimer);
+  cycleTimer = null;
+}
+
 // An always-on display that only fetches at startup shows whatever the XP was
-// when the PC last woke up. Poll instead, and stop entirely while hidden so a
-// background tab is not rebuilding the DOM and hitting the network forever.
+// when the PC last woke. Poll, and stop entirely while hidden.
 function startPollTimer() {
   stopPollTimer();
   if (REFRESH_INTERVAL_MS <= 0) return;
   pollTimer = setInterval(function () {
     if (document.hidden) return;
-    loadData();
-    if (state.category === "gim") loadGimData();
+    refreshAll();
   }, REFRESH_INTERVAL_MS);
 }
 
 function stopPollTimer() {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+function refreshAll() {
+  loadData();
+  if (state.category === "gim") loadGimData();
 }
 
 function setupVisibilityHandling() {
@@ -71,1031 +229,342 @@ function setupVisibilityHandling() {
       stopPollTimer();
       return;
     }
-    // Coming back from hidden: the data is by definition suspect.
+    // Back from hidden: the data is suspect by definition.
     startPollTimer();
     startCycleTimer();
-    loadData();
-    if (state.category === "gim") loadGimData();
+    refreshAll();
   });
 }
- 
-// --- Data Loading ---
-function loadData() {
-  if (abortController) abortController.abort();
-  abortController = new AbortController();
- 
-  state.error = null;
-  if (state.items.length === 0) state.loading = true;
-  render();
- 
-  loadPlayer(state.player, abortController.signal)
-    .then(function (result) {
-      state.fetchedAt = result.fetchedAt;
-      state.stale = result.stale;
-      state.error = result.data ? null : result.error;
-      if (!result.data) return;
 
-      const mapped = mapHiscoresToDisplayItems(result.data);
-      state.items = mapped;
- 
-      // Preserve selection
-      if (state.category !== "total" && state.category !== "gim") {
-        const desiredId = state.pinnedId || state.lastSelectedId;
-        if (desiredId) {
-          const filtered = getFiltered(mapped);
-          const idx = filtered.findIndex(function (x) { return x.id === desiredId; });
-          state.index = idx >= 0 ? idx : 0;
-        } else {
-          const filtered = getFiltered(mapped);
-          if (filtered.length > 0) {
-            state.index = Math.min(state.index, filtered.length - 1);
-          } else {
-            state.index = 0;
-          }
-        }
-      }
-    })
-    .catch(function (e) {
-      if (e.name === "AbortError" || e.name === "TimeoutError") return;
-      state.error = e.message || "Unknown error";
-    })
-    .finally(function () {
-      state.loading = false;
-      state.refreshing = false;
-      render();
-      startCycleTimer();
-    });
-}
- 
-// --- Helpers ---
-function getFiltered(items) {
-  if (!items) items = state.items;
-  if (state.category === "total" || state.category === "gim") return [];
-  return items.filter(function (i) { return i.category === state.category; });
-}
- 
-function getCurrent() {
-  const filtered = getFiltered();
-  return filtered[state.index] || null;
-}
- 
-function getSkillItems() {
-  return state.items.filter(function (i) { return i.category === "skills"; });
-}
- 
-function getPickerItems() {
-  const filtered = getFiltered();
-  if (state.category === "skills") {
-    const byName = new Map(filtered.map(function (s) { return [s.name, s]; }));
-    return SKILL_GRID_ORDER
-      .map(function (n) { return byName.get(n); })
-      .filter(Boolean);
-  }
-  return filtered.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
-}
- 
-// --- Auto-cycle timer ---
-function startCycleTimer() {
-  stopCycleTimer();
-  if (state.category === "total" || state.category === "gim") return;
-  if (state.pinned || state.pinnedId) return;
-  // The picker is rebuilt by render(), so cycling while it is open wipes the
-  // search box and its focus mid-typing.
-  if (state.pickerOpen) return;
-  if (document.hidden) return;
-  if (CYCLE_INTERVAL_MS <= 0) return;
-  const filtered = getFiltered();
-  if (filtered.length <= 1) return;
- 
-  cycleTimer = setInterval(function () {
-    const filtered = getFiltered();
-    if (filtered.length === 0) return;
-    state.index = (state.index + 1) % filtered.length;
-    render();
-  }, CYCLE_INTERVAL_MS);
-}
- 
-function stopCycleTimer() {
-  if (cycleTimer) {
-    clearInterval(cycleTimer);
-    cycleTimer = null;
-  }
-}
- 
-// --- Actions ---
+// --- Actions ---------------------------------------------------------------
+
 function onRefresh() {
   state.refreshing = true;
-  loadData();
-  if (state.category === "gim") loadGimData();
+  invalidate("header");
+  refreshAll();
 }
- 
+
 function setCategory(cat) {
+  if (state.category === cat) return;
   state.category = cat;
   state.index = 0;
-  state.pickerOpen = false;
-  render();
+  invalidate();
   startCycleTimer();
-  if (cat === "gim" && !state.gim.loaded) loadGimData();
+  if (cat === "gim" && !state.gim.loaded && !state.gim.loading) loadGimData();
 }
- 
-function jumpToId(id) {
-  const filtered = getFiltered();
-  const idx = filtered.findIndex(function (x) { return x.id === id; });
-  if (idx >= 0) state.index = idx;
-}
- 
+
 function onPrev() {
-  state.index = Math.max(0, state.index - 1);
-  render();
+  const count = getFiltered().length;
+  if (count === 0) return;
+  state.index = (state.index - 1 + count) % count;
+  invalidate("header", "main");
 }
- 
+
 function onNext() {
-  const filtered = getFiltered();
-  state.index = filtered.length ? (state.index + 1) % filtered.length : 0;
-  render();
+  const count = getFiltered().length;
+  if (count === 0) return;
+  state.index = (state.index + 1) % count;
+  invalidate("header", "main");
 }
- 
+
 function onTogglePin() {
-  state.pinned = !state.pinned;
-  if (state.pinned) state.pinnedId = null;
-  else state.pinnedId = null;
-  render();
+  const wasPinned = state.pinned || state.pinnedId;
+  state.pinned = !wasPinned;
+  state.pinnedId = null;
+  invalidate("footer");
   startCycleTimer();
 }
- 
-function onPickerOpen() {
-  state.pickerOpen = true;
-  stopCycleTimer();
-  render();
-}
- 
-function onPickerClose() {
-  state.pickerOpen = false;
-  render();
-  startCycleTimer();
-}
- 
-function onPickerSelect(id) {
-  jumpToId(id);
-  state.pickerOpen = false;
-  render();
-}
- 
-function onPickerPin(id) {
-  state.pinnedId = (state.pinnedId === id) ? null : id;
-  state.pinned = true;
-  jumpToId(id);
-  render();
-  startCycleTimer();
-}
- 
+
 function onPlayerChange(name) {
+  if (name === state.player) return;
   state.player = name;
   state.index = 0;
+  state.lastSelectedId = null;
+  invalidate("footer");
   loadData();
 }
- 
-// --- Outside click handler for player menu ---
-function setupOutsideClickHandlers() {
-  document.addEventListener("mousedown", function (e) {
-    const menu = document.querySelector(".playerMenu");
-    if (menu && !menu.contains(e.target)) {
-      const panel = document.querySelector(".playerMenuPanel");
-      if (panel) {
-        panel.remove();
-        const chevron = menu.querySelector(".playerMenuChevron");
-        if (chevron) chevron.classList.remove("open");
-      }
-    }
-  });
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") {
-      const panel = document.querySelector(".playerMenuPanel");
-      if (panel) panel.remove();
-      if (state.pickerOpen) {
-        state.pickerOpen = false;
-        render();
-        startCycleTimer();
-      }
-    }
-  });
-}
- 
-// ============================================================
-// RENDERING
-// ============================================================
- 
-function render() {
-  const current = getCurrent();
-  if (current) state.lastSelectedId = current.id;
- 
-  $app.innerHTML = "";
-  $app.className = "app";
- 
-  $app.appendChild(renderHeader(current));
-  $app.appendChild(renderMain(current));
-  $app.appendChild(renderFooter());
- 
-  if (state.pickerOpen) {
-    $app.appendChild(renderPickerModal());
-  }
-}
- 
-// --- Header ---
-function renderHeader(current) {
-  const header = el("header", "header");
- 
-  // Action buttons
-  const actions = el("div", "headerActions");
- 
-  // Refresh button
-  const refreshBtn = el("button", "iconBtn");
-  refreshBtn.type = "button";
-  refreshBtn.title = "Refresh";
-  refreshBtn.disabled = state.loading || state.refreshing;
-  refreshBtn.innerHTML = renderRefreshIcon(state.refreshing);
-  refreshBtn.onclick = onRefresh;
-  actions.appendChild(refreshBtn);
- 
-  // Grid/Picker button
-  const gridBtn = el("button", "iconBtn");
-  gridBtn.type = "button";
-  gridBtn.title = "Pick item";
-  gridBtn.disabled = state.loading || state.category === "total" || state.category === "gim";
-  gridBtn.innerHTML = renderGridIcon();
-  gridBtn.onclick = onPickerOpen;
-  actions.appendChild(gridBtn);
- 
-  header.appendChild(actions);
- 
-  // Center content
-  const center = el("div", "headerCenter");
- 
-  if (state.category === "gim") {
-    const gimLabel = el("div", "headerGimOnly");
-    gimLabel.textContent = "GIM Levels";
-    center.appendChild(gimLabel);
-  } else {
-    const playerName = el("div", "headerPlayer");
-    playerName.textContent = state.player;
-    center.appendChild(playerName);
- 
-    const itemRow = el("div", "headerItemRow");
- 
-    const iconWrap = el("div", "iconWrap");
-    if (state.category === "total") {
-      const img = document.createElement("img");
-      img.className = "icon";
-      img.src = "wwwroot/icons/skills/total.png";
-      img.alt = "Total";
-      iconWrap.appendChild(img);
-    } else if (current && current.iconUrl) {
-      const img = document.createElement("img");
-      img.className = "icon";
-      img.src = current.iconUrl;
-      img.alt = current.name;
-      iconWrap.appendChild(img);
-    }
-    itemRow.appendChild(iconWrap);
- 
-    const title = el("div", "title");
-    if (state.category === "total") {
-      title.textContent = "Totals";
-    } else if (current) {
-      if (current.category === "skills") {
-        title.textContent = current.name + " - " + (current.skillLevel || current.milestoneCurrent || 0);
-      } else {
-        title.textContent = current.name;
-      }
-    } else {
-      title.textContent = state.loading ? "Loading..." : "No data";
-    }
-    itemRow.appendChild(title);
-    center.appendChild(itemRow);
 
-    if (state.stale && state.fetchedAt) {
-      const staleTag = el("div", "staleTag");
-      staleTag.textContent = "as of " + formatClock(state.fetchedAt);
-      staleTag.title = state.error || "Refresh failed - showing cached data";
-      center.appendChild(staleTag);
-    }
-  }
- 
-  header.appendChild(center);
-  return header;
+function jumpToId(id) {
+  const idx = getFiltered().findIndex(function (x) { return x.id === id; });
+  if (idx >= 0) state.index = idx;
 }
- 
-// --- Main content ---
-function renderMain(current) {
-  if (state.category === "total") {
-    const main = el("main", "grid");
-    const section = el("section", "card full cardTotal");
-    if (state.loading) {
-      section.textContent = "Loading\u2026";
-    } else if (state.error) {
-      section.textContent = state.error;
-    } else {
-      section.appendChild(renderTotalGrid());
-    }
-    main.appendChild(section);
-    return main;
-  }
- 
+
+// --- Header ----------------------------------------------------------------
+
+// Anchored to the header bar rather than to the centred card, so it cannot
+// sit on top of the player name.
+function buildHeaderActions() {
+  const actions = el("div", "headerActions");
+  actions.appendChild(iconButton("Refresh", refreshIcon(state.refreshing), onRefresh,
+    state.loading || state.refreshing));
+  actions.appendChild(iconButton("Pick item", gridIcon(), openPicker,
+    state.loading || !ITEM_CATEGORIES.has(state.category)));
+  return actions;
+}
+
+function buildHeaderCenter(current) {
+  const center = el("div", "headerCenter");
+
   if (state.category === "gim") {
-    const main = el("main", "mainFill");
-    const section = el("section", "card full cardTotal");
-    section.style.width = "100%";
-    section.style.height = "100%";
-    section.appendChild(renderGimLayout());
-    main.appendChild(section);
-    return main;
+    center.appendChild(el("div", "headerGimOnly", "GIM Levels"));
+    return center;
   }
- 
-  // Skills / Bosses / Activities
-  const main = el("main", "grid");
- 
-  // Left arc
-  const leftCard = el("section", "card cardArc");
-  if (state.loading) {
-    leftCard.textContent = "Loading\u2026";
-  } else if (state.error) {
-    leftCard.textContent = state.error;
+
+  center.appendChild(el("div", "headerPlayer", state.player));
+
+  const itemRow = el("div", "headerItemRow");
+  const iconWrap = el("div", "iconWrap");
+
+  if (state.category === "total") {
+    iconWrap.appendChild(img("wwwroot/icons/skills/total.png", "Total", "icon"));
   } else if (current) {
-    const primaryRemaining = Math.max(0, current.primaryTarget - current.primaryCurrent);
-    const primarySub = current.milestoneUnit === "kills"
-      ? fmt(primaryRemaining) + " Remaining"
-      : fmt(primaryRemaining) + " XP Left";
-    leftCard.appendChild(renderArcGauge({
-      value: current.primaryCurrent,
-      max: current.primaryTarget,
-      labelTop: current.primaryLabelTop,
-      centerMainParts: {
-        top: fmt(current.primaryCurrent),
-        bottom: fmt(current.primaryTarget)
-      },
-      centerSub: primarySub,
-      centerHint: current.milestoneUnit === "kills" ? "To next milestone" : "To next level"
-    }));
-  } else {
-    leftCard.textContent = "No item";
+    iconWrap.appendChild(img(current.iconUrl, current.name, "icon"));
   }
-  main.appendChild(leftCard);
- 
-  // Right arc or rank
-  const rightCard = el("section", "card cardArc");
-  if (state.loading) {
-    rightCard.textContent = "Loading\u2026";
-  } else if (state.error) {
-    rightCard.textContent = state.error;
-  } else if (current) {
-    if (current.secondaryType === "rank") {
-      rightCard.appendChild(renderRankBadge(
-        current.secondaryLabelTop,
-        formatRank(current.secondaryCurrent)
-      ));
-    } else {
-      const secRemaining = Math.max(0, (current.secondaryTarget || 0) - (current.secondaryCurrent || 0));
-      rightCard.appendChild(renderArcGauge({
-        value: current.secondaryCurrent || 0,
-        max: current.secondaryTarget || 1,
-        labelTop: current.secondaryLabelTop,
-        centerMainParts: {
-          top: fmt(current.secondaryCurrent || 0),
-          bottom: fmt(current.secondaryTarget || 1)
-        },
-        centerSub: fmt(secRemaining) + " XP Left",
-        centerHint: "To 99"
-      }));
-    }
-  } else {
-    rightCard.textContent = "No item";
+  itemRow.appendChild(iconWrap);
+  itemRow.appendChild(el("div", "title", headerTitle(current)));
+  center.appendChild(itemRow);
+
+  if (state.stale && state.fetchedAt) {
+    const tag = el("div", "staleTag", "as of " + formatClock(state.fetchedAt));
+    tag.title = state.error || "Refresh failed - showing cached data";
+    center.appendChild(tag);
   }
-  main.appendChild(rightCard);
- 
-  // Milestones
-  const msCard = el("section", "card full cardTotal");
-  if (current) {
-    msCard.appendChild(renderMilestoneBar(current.milestones, current.milestoneCurrent));
-  }
-  main.appendChild(msCard);
- 
-  return main;
+
+  return center;
 }
- 
-// --- Footer ---
-function renderFooter() {
-  const footer = el("footer", "footer");
- 
-  // Tabs
+
+function headerTitle(current) {
+  if (state.category === "total") return "Totals";
+  if (!current) return state.loading ? "Loading…" : "No data";
+  if (current.category === "skills") return current.name + " - " + (current.skillLevel || 0);
+  return current.name;
+}
+
+// --- Footer ----------------------------------------------------------------
+
+function buildTabs() {
   const tabs = el("div", "tabs");
-  const categories = ["skills", "bosses", "activities", "total", "gim"];
-  const labels = ["Skills", "Bosses", "Activities", "Total", "GIM"];
- 
-  categories.forEach(function (cat, i) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "tab" + (state.category === cat ? " tabActive" : "");
-    btn.textContent = labels[i];
-    btn.onclick = function () { setCategory(cat); };
+  tabs.setAttribute("role", "tablist");
+
+  CATEGORIES.forEach(function (cat) {
+    const active = state.category === cat.id;
+    const btn = button("tab" + (active ? " tabActive" : ""), cat.label, function () {
+      setCategory(cat.id);
+    });
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", active ? "true" : "false");
     tabs.appendChild(btn);
   });
-  footer.appendChild(tabs);
- 
-  // Controls
+  return tabs;
+}
+
+function buildControls() {
   const controls = el("div", "controls");
-  const filtered = getFiltered();
-  const isSpecial = state.category === "total" || state.category === "gim";
- 
-  // Pin button
-  const pinBtn = document.createElement("button");
-  pinBtn.type = "button";
-  pinBtn.className = "btn" + ((state.pinned || state.pinnedId) ? " btnPin" : "");
-  pinBtn.textContent = (state.pinned || state.pinnedId) ? "Pinned" : "Pin";
-  pinBtn.disabled = isSpecial;
-  pinBtn.onclick = onTogglePin;
-  controls.appendChild(pinBtn);
- 
-  // Prev
-  const prevBtn = document.createElement("button");
-  prevBtn.type = "button";
-  prevBtn.className = "btn";
-  prevBtn.textContent = "Prev";
-  prevBtn.disabled = filtered.length === 0 || isSpecial;
-  prevBtn.onclick = onPrev;
-  controls.appendChild(prevBtn);
- 
-  // Next
-  const nextBtn = document.createElement("button");
-  nextBtn.type = "button";
-  nextBtn.className = "btn";
-  nextBtn.textContent = "Next";
-  nextBtn.disabled = filtered.length === 0 || isSpecial;
-  nextBtn.onclick = onNext;
-  controls.appendChild(nextBtn);
- 
-  // Player menu
-  controls.appendChild(renderPlayerMenu());
- 
-  footer.appendChild(controls);
-  return footer;
-}
- 
-// ============================================================
-// COMPONENT RENDERERS
-// ============================================================
- 
-// --- Arc Gauge (SVG) ---
-function renderArcGauge(opts) {
-  const value = opts.value;
-  const max = opts.max;
-  const labelTop = opts.labelTop;
-  const parts = opts.centerMainParts;
-  const centerSub = opts.centerSub;
-  const centerHint = opts.centerHint;
- 
-  const pct = max <= 0 ? 0 : clamp((value / max) * 100, 0, 100);
-  const size = 200;
-  const stroke = 14;
-  const r = (size - stroke) / 2;
-  const cx = size / 2;
-  const cy = size / 2;
- 
-  const startAngle = (-210 * Math.PI) / 180;
-  const endAngle = (30 * Math.PI) / 180;
-  const sweep = endAngle - startAngle;
-  const arcLen = r * sweep;
-  const filledLen = (pct / 100) * arcLen;
- 
-  const start = polar(cx, cy, r, startAngle);
-  const end = polar(cx, cy, r, endAngle);
-  const d = "M " + start.x + " " + start.y + " A " + r + " " + r + " 0 1 1 " + end.x + " " + end.y;
- 
-  const x = cx;
-  const yTop = cy - 40;
-  const yLine = yTop + 15;
-  const yBottom = yTop + 40;
-  const ySub = yTop + 70;
-  const yHint = yTop + 100;
- 
-  const wrapper = el("div", "gauge");
- 
-  const label = el("div", "gaugeTop");
-  label.textContent = labelTop;
-  wrapper.appendChild(label);
- 
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("width", size);
-  svg.setAttribute("height", size);
-  svg.setAttribute("class", "gaugeSvg");
-  svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", labelTop);
- 
-  // Track
-  const track = document.createElementNS(ns, "path");
-  track.setAttribute("d", d);
-  track.setAttribute("class", "gaugeTrack");
-  track.setAttribute("stroke-width", stroke);
-  track.setAttribute("fill", "none");
-  svg.appendChild(track);
- 
-  // Fill
-  const fill = document.createElementNS(ns, "path");
-  fill.setAttribute("d", d);
-  fill.setAttribute("class", "gaugeFill");
-  fill.setAttribute("stroke-width", stroke);
-  fill.setAttribute("fill", "none");
-  fill.style.strokeDasharray = filledLen + " " + Math.max(0, arcLen - filledLen);
-  svg.appendChild(fill);
- 
-  // Text - fraction style
-  if (parts) {
-    const topText = createSvgText(ns, x, yTop, "gaugeTextMain", parts.top);
-    svg.appendChild(topText);
- 
-    const line = document.createElementNS(ns, "line");
-    line.setAttribute("x1", x - 60);
-    line.setAttribute("x2", x + 60);
-    line.setAttribute("y1", yLine);
-    line.setAttribute("y2", yLine);
-    line.setAttribute("class", "gaugeFracLine");
-    line.setAttribute("stroke-width", 2);
-    line.setAttribute("stroke-linecap", "round");
-    svg.appendChild(line);
- 
-    const bottomText = createSvgText(ns, x, yBottom, "gaugeTextMain", parts.bottom);
-    svg.appendChild(bottomText);
-  }
- 
-  if (centerSub) {
-    svg.appendChild(createSvgText(ns, x, ySub, "gaugeTextSub", centerSub));
-  }
-  if (centerHint) {
-    svg.appendChild(createSvgText(ns, x, yHint, "gaugeTextHint", centerHint));
-  }
- 
-  wrapper.appendChild(svg);
-  return wrapper;
-}
- 
-function polar(cx, cy, r, angleRad) {
-  return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
-}
- 
-function createSvgText(ns, x, y, className, content) {
-  const t = document.createElementNS(ns, "text");
-  t.setAttribute("x", x);
-  t.setAttribute("y", y);
-  t.setAttribute("text-anchor", "middle");
-  t.setAttribute("class", className);
-  t.textContent = content;
-  return t;
-}
- 
-// --- Rank Badge ---
-function renderRankBadge(labelTop, valueText) {
-  const wrapper = el("div", "rankWrap");
- 
-  const label = el("div", "gaugeTop");
-  label.textContent = labelTop;
-  wrapper.appendChild(label);
- 
-  const circle = el("div", "rankCircle");
-  const value = el("div", "rankValue");
-  value.textContent = valueText;
-  circle.appendChild(value);
-  wrapper.appendChild(circle);
- 
-  const bottom = el("div", "gaugeBottom");
-  const sub = el("div", "gaugeSub");
-  sub.textContent = "Global rank";
-  bottom.appendChild(sub);
-  wrapper.appendChild(bottom);
- 
-  return wrapper;
-}
- 
-// --- Milestone Bar ---
-function renderMilestoneBar(milestones, current) {
-  const wrapper = el("div", "milestones");
- 
-  const title = el("div", "milestoneTitle");
-  title.textContent = "Overall Milestones";
-  wrapper.appendChild(title);
- 
-  const row = el("div", "milestoneRow customScroll");
-  const points = [0].concat(milestones);
- 
-  points.forEach(function (p, idx) {
-    if (idx === 0) {
-      const bubble = el("div", "bubble dim");
-      bubble.textContent = p;
-      row.appendChild(bubble);
-      return;
-    }
- 
-    const prev = points[idx - 1];
-    const segPct = segmentFillPct(current, prev, p);
- 
-    const segWrap = el("div", "segWrap");
- 
-    const segTrack = el("div", "segTrack");
-    const segFill = el("div", "segFill");
-    segFill.style.width = segPct + "%";
-    segTrack.appendChild(segFill);
-    segWrap.appendChild(segTrack);
- 
-    const bubble = el("div", "bubble " + (current >= p ? "bright" : "dim"));
-    bubble.textContent = p;
-    segWrap.appendChild(bubble);
- 
-    row.appendChild(segWrap);
-  });
- 
-  wrapper.appendChild(row);
-  return wrapper;
-}
- 
-// --- Total Grid ---
-function renderTotalGrid() {
-  const skillItems = getSkillItems();
-  const byName = new Map(skillItems.map(function (s) { return [s.name, s]; }));
-  const ordered = SKILL_GRID_ORDER
-    .map(function (n) { return byName.get(n); })
-    .filter(Boolean);
- 
-  const totalLevel = skillItems.reduce(function (sum, s) {
-    return sum + (s.skillLevel || s.milestoneCurrent || 0);
-  }, 0);
-  const totalXp = skillItems.reduce(function (sum, s) {
-    return sum + (s.skillXp || 0);
-  }, 0);
- 
-  const wrap = el("div", "totalGridWrap");
-  const grid = el("div", "totalGrid");
- 
-  ordered.forEach(function (s) {
-    const lvl = s.skillLevel || s.milestoneCurrent || 0;
-    const pct = Math.max(0, Math.min(1, (s.levelProgressPct || 0) / 100));
-    const barColor = pctToColor(pct);
- 
-    const tile = el("div", "skillTile");
- 
-    const top = el("div", "skillTileTop");
-    const icon = document.createElement("img");
-    icon.className = "skillTileIcon";
-    icon.src = s.iconUrl;
-    icon.alt = s.name;
-    top.appendChild(icon);
- 
-    const name = el("div", "skillTileName");
-    name.textContent = s.name;
-    top.appendChild(name);
- 
-    const level = el("div", "skillTileLevel");
-    level.textContent = lvl;
-    top.appendChild(level);
- 
-    tile.appendChild(top);
- 
-    const bar = el("div", "skillTileBar");
-    const barFill = el("div", "skillTileBarFill");
-    barFill.style.width = (pct * 100) + "%";
-    barFill.style.backgroundColor = barColor;
-    bar.appendChild(barFill);
-    tile.appendChild(bar);
- 
-    grid.appendChild(tile);
-  });
- 
-  wrap.appendChild(grid);
- 
-  // Footer
-  const footer = el("div", "totalFooter");
- 
-  const statLevel = el("div", "totalFooterStat");
-  const lblLevel = el("div", "totalFooterLabel");
-  lblLevel.textContent = "Total level";
-  statLevel.appendChild(lblLevel);
-  const valLevel = el("div", "totalFooterValue");
-  valLevel.textContent = totalLevel.toLocaleString();
-  statLevel.appendChild(valLevel);
-  footer.appendChild(statLevel);
- 
-  const statXp = el("div", "totalFooterStat");
-  const lblXp = el("div", "totalFooterLabel");
-  lblXp.textContent = "Total XP";
-  statXp.appendChild(lblXp);
-  const valXp = el("div", "totalFooterValue");
-  valXp.textContent = totalXp.toLocaleString();
-  statXp.appendChild(valXp);
-  footer.appendChild(statXp);
- 
-  wrap.appendChild(footer);
-  return wrap;
-}
- 
-// --- GIM View ---
-// Loads every member concurrently. Each member resolves to its own result so a
-// single failure degrades one panel instead of the whole view - and never gets
-// replaced with invented level-1 data.
-function loadGimData() {
-  if (gimAbortController) gimAbortController.abort();
-  gimAbortController = new AbortController();
+  const isItemView = ITEM_CATEGORIES.has(state.category);
+  const empty = getFiltered().length === 0;
+  const isPinned = !!(state.pinned || state.pinnedId);
 
-  state.gim.loading = true;
-  render();
+  const pin = button("btn" + (isPinned ? " btnPin" : ""), isPinned ? "Pinned" : "Pin", onTogglePin);
+  pin.disabled = !isItemView;
+  pin.setAttribute("aria-pressed", isPinned ? "true" : "false");
+  controls.appendChild(pin);
 
-  const names = GIM_PLAYERS.map(function (slot) { return slot.name; });
+  const prev = button("btn", "Prev", onPrev);
+  prev.disabled = !isItemView || empty;
+  controls.appendChild(prev);
 
-  loadPlayers(names, gimAbortController.signal)
-    .then(function (results) {
-      state.gim.results = results;
-      state.gim.loaded = true;
-    })
-    .catch(function (e) {
-      if (e.name === "AbortError" || e.name === "TimeoutError") return;
-      state.gim.results = [];
-    })
-    .finally(function () {
-      state.gim.loading = false;
-      render();
-    });
+  const next = button("btn", "Next", onNext);
+  next.disabled = !isItemView || empty;
+  controls.appendChild(next);
+
+  controls.appendChild(buildPlayerMenu());
+  return controls;
 }
 
-function renderGimLayout() {
-  if (state.gim.loading && !state.gim.loaded) {
-    const msg = el("div", "gimLoading");
-    msg.textContent = "Loading GIM\u2026";
-    return msg;
-  }
-
-  const byName = new Map(state.gim.results.map(function (r) { return [r.player, r]; }));
-  const layout = el("div", "gimLayout");
-
-  GIM_PLAYERS.forEach(function (slot) {
-    const slotDiv = el("div", "gimSlot " + slot.pos);
-    slotDiv.appendChild(renderGimPanel(slot.name, byName.get(slot.name)));
-    layout.appendChild(slotDiv);
-  });
-
-  return layout;
-}
-
-function renderGimPanel(name, result) {
-  const panel = el("div", "gimPanel");
-
-  const header = el("div", "gimPanelHeader");
-  const nameEl = el("div", "gimPanelName");
-  nameEl.textContent = name;
-  header.appendChild(nameEl);
-
-  if (result && result.stale) {
-    const tag = el("div", "gimPanelTag");
-    tag.textContent = "as of " + formatClock(result.fetchedAt);
-    tag.title = result.error || "Showing cached data";
-    header.appendChild(tag);
-  }
-  panel.appendChild(header);
-
-  // No data at all: say so. Showing every skill at level 1 misrepresents a
-  // teammate's account as a fresh one over what is usually a transient blip.
-  if (!result || !result.data) {
-    const err = el("div", "gimPanelError");
-    err.textContent = result && result.error ? result.error : "No data";
-    panel.appendChild(err);
-    return panel;
-  }
-
-  const byName = new Map(
-    result.data.skills.map(function (s) { return [s.name, s]; })
-  );
-  const allSkills = GIM_SKILL_ORDER.flat();
-
-  const grid = el("div", "gimSkillsGrid");
-  grid.style.setProperty("--gim-cols", "8");
-
-  allSkills.forEach(function (skill) {
-    const s = byName.get(skill);
-    const level = Math.max(1, (s && s.level > 0 ? s.level : 1));
-    const xp = s && s.xp > 0 ? s.xp : 0;
-
-    const curLevelXp = xpForLevel(level);
-    const nextLevelXp = xpForLevel(Math.min(126, level + 1));
-    const inLevel = Math.max(0, xp - curLevelXp);
-    const needed = Math.max(1, nextLevelXp - curLevelXp);
-    const pct = clamp((inLevel / needed) * 100, 0, 100);
-
-    const cell = el("div", "gimSkillCell");
-
-    const top = el("div", "gimSkillTop");
-    const icon = document.createElement("img");
-    icon.className = "gimSkillIcon";
-    icon.src = iconForSkill(skill);
-    icon.alt = skill;
-    top.appendChild(icon);
-
-    const lvl = el("div", "gimSkillLvl");
-    lvl.textContent = level;
-    top.appendChild(lvl);
-    cell.appendChild(top);
-
-    const barTrack = el("div", "gimSkillBarTrack");
-    const barFill = el("div", "gimSkillBarFill");
-    barFill.style.width = pct + "%";
-    barFill.style.background = pctToColor(pct / 100);
-    barTrack.appendChild(barFill);
-    cell.appendChild(barTrack);
-
-    grid.appendChild(cell);
-  });
-
-  panel.appendChild(grid);
-
-  const totals = skillTotals(result.data);
-  const totalsRow = el("div", "gimTotals");
-
-  const left = el("div", "gimTotalsLeft");
-  left.appendChild(document.createTextNode("Total level: "));
-  const leftVal = document.createElement("span");
-  leftVal.textContent = totals.level.toLocaleString();
-  left.appendChild(leftVal);
-  totalsRow.appendChild(left);
-
-  const right = el("div", "gimTotalsRight");
-  right.appendChild(document.createTextNode("Total xp: "));
-  const rightVal = document.createElement("span");
-  rightVal.textContent = totals.xp.toLocaleString();
-  right.appendChild(rightVal);
-  totalsRow.appendChild(right);
-
-  panel.appendChild(totalsRow);
-  return panel;
-}
-
-// --- Picker Modal ---
-function renderPickerModal() {
-  const overlay = el("div", "modalOverlay");
-  overlay.onmousedown = function (e) {
-    if (e.target === overlay) onPickerClose();
-  };
- 
-  const modal = el("div", "modal");
-  modal.onmousedown = function (e) { e.stopPropagation(); };
- 
-  // Header
-  const header = el("div", "modalHeader");
-  const title = el("div", "modalTitle");
-  const catName = state.category.charAt(0).toUpperCase() + state.category.slice(1);
-  title.textContent = "Pick a " + catName;
-  header.appendChild(title);
- 
-  const closeBtn = document.createElement("button");
-  closeBtn.type = "button";
-  closeBtn.className = "btn";
-  closeBtn.textContent = "Close";
-  closeBtn.onclick = onPickerClose;
-  header.appendChild(closeBtn);
-  modal.appendChild(header);
- 
-  // Search
-  const input = document.createElement("input");
-  input.className = "input";
-  input.placeholder = "Search\u2026";
-  input.oninput = function () {
-    renderPickerGrid(grid, input.value);
-  };
-  modal.appendChild(input);
- 
-  // Grid
-  const grid = el("div", "pickerGrid");
-  renderPickerGrid(grid, "");
-  modal.appendChild(grid);
- 
-  overlay.appendChild(modal);
-  return overlay;
-}
- 
-function renderPickerGrid(container, query) {
-  container.innerHTML = "";
-  const items = getPickerItems();
-  const q = query.trim().toLowerCase();
-  const filtered = q ? items.filter(function (x) { return x.name.toLowerCase().includes(q); }) : items;
- 
-  filtered.forEach(function (it) {
-    const isPinned = state.pinnedId === it.id;
- 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "pickerCell" + (isPinned ? " pickerCellPinned" : "");
-    btn.title = it.name;
-    btn.onclick = function () { onPickerSelect(it.id); };
- 
-    const icon = document.createElement("img");
-    icon.className = "pickerIcon";
-    icon.src = it.iconUrl;
-    icon.alt = "";
-    btn.appendChild(icon);
- 
-    const name = el("div", "pickerName");
-    name.textContent = it.name;
-    btn.appendChild(name);
- 
-    const pinRow = el("div", "pickerPinRow");
-    const pinText = document.createElement("span");
-    pinText.className = "pickerPinText";
-    pinText.textContent = isPinned ? "Pinned" : "Pin";
-    pinRow.appendChild(pinText);
- 
-    const pinBtn = document.createElement("button");
-    pinBtn.type = "button";
-    pinBtn.className = "btn btnMini" + (isPinned ? " btnPin" : "");
-    pinBtn.textContent = "\uD83D\uDCCC"; // 📌
-    pinBtn.onclick = function (e) {
-      e.stopPropagation();
-      onPickerPin(it.id);
-    };
-    pinRow.appendChild(pinBtn);
-    btn.appendChild(pinRow);
- 
-    container.appendChild(btn);
-  });
-}
- 
-// --- Player Menu ---
-function renderPlayerMenu() {
+function buildPlayerMenu() {
   const wrapper = el("div", "playerMenu");
- 
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "btn playerMenuBtn";
-  btn.disabled = state.loading || state.refreshing;
-  btn.title = "Select player";
- 
-  const valueSpan = document.createElement("span");
-  valueSpan.className = "playerMenuValue";
-  valueSpan.textContent = state.player;
-  btn.appendChild(valueSpan);
- 
-  const chevron = document.createElement("span");
-  chevron.className = "playerMenuChevron";
-  chevron.textContent = "\u25BE"; // ▾
-  btn.appendChild(chevron);
- 
-  btn.onclick = function () {
-    const existing = wrapper.querySelector(".playerMenuPanel");
-    if (existing) {
-      existing.remove();
-      chevron.classList.remove("open");
-      return;
-    }
+
+  const btn = button("btn playerMenuBtn", null, function () {
+    const open = wrapper.querySelector(".playerMenuPanel");
+    if (open) return closeMenu();
+
     chevron.classList.add("open");
- 
+    btn.setAttribute("aria-expanded", "true");
+
     const panel = el("div", "playerMenuPanel");
     panel.setAttribute("role", "listbox");
- 
     PLAYER_OPTIONS.forEach(function (name) {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "playerMenuItem" + (name === state.player ? " active" : "");
-      item.textContent = name;
-      item.setAttribute("role", "option");
-      item.onclick = function () {
+      const active = name === state.player;
+      const item = button("playerMenuItem" + (active ? " active" : ""), name, function () {
         onPlayerChange(name);
-        panel.remove();
-        chevron.classList.remove("open");
-      };
+      });
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", active ? "true" : "false");
       panel.appendChild(item);
     });
- 
     wrapper.appendChild(panel);
-  };
- 
+  });
+  btn.disabled = state.loading || state.refreshing;
+  btn.title = "Select player";
+  btn.setAttribute("aria-haspopup", "listbox");
+  btn.setAttribute("aria-expanded", "false");
+
+  btn.appendChild(el("span", "playerMenuValue", state.player));
+  const chevron = el("span", "playerMenuChevron", "▾");
+  btn.appendChild(chevron);
+
+  function closeMenu() {
+    const panel = wrapper.querySelector(".playerMenuPanel");
+    if (panel) panel.remove();
+    chevron.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+  }
+
+  // Close on any pointer press outside the menu.
+  document.addEventListener("pointerdown", function (e) {
+    if (!wrapper.isConnected) return;
+    if (!wrapper.contains(e.target)) closeMenu();
+  });
+
   wrapper.appendChild(btn);
   return wrapper;
 }
- 
-// --- SVG Icons ---
-function renderRefreshIcon(spinning) {
-  const style = spinning ? ' style="animation: spin 1s linear infinite"' : '';
-  return '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"' + style + '>' +
-    '<path d="M21 12a9 9 0 1 1-2.64-6.36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-    '<path d="M21 3v7h-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-    '</svg>';
+
+// --- Picker ----------------------------------------------------------------
+// Built once and kept outside #app so repaints cannot touch its input.
+
+function buildPickerDialog() {
+  const dialog = document.createElement("dialog");
+  dialog.className = "pickerDialog";
+
+  const header = el("div", "modalHeader");
+  const title = el("div", "modalTitle", "Pick an item");
+  header.appendChild(title);
+  header.appendChild(button("btn", "Close", closePicker));
+
+  const input = document.createElement("input");
+  input.className = "input";
+  input.type = "search";
+  input.placeholder = "Search…";
+  input.setAttribute("aria-label", "Search items");
+
+  const grid = el("div", "pickerGrid");
+  grid.setAttribute("role", "listbox");
+
+  input.addEventListener("input", function () { paintPickerGrid(grid, input.value); });
+  dialog.append(header, input, grid);
+
+  // Native dialogs close on Escape and on backdrop click if we forward it.
+  dialog.addEventListener("close", function () {
+    if (!state.pickerOpen) return;
+    state.pickerOpen = false;
+    invalidate("footer");
+    startCycleTimer();
+  });
+  dialog.addEventListener("pointerdown", function (e) {
+    if (e.target === dialog) closePicker();
+  });
+
+  return { dialog: dialog, title: title, input: input, grid: grid };
 }
- 
-function renderGridIcon() {
-  return '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">' +
-    '<rect x="2" y="2" width="5" height="5" rx="1"/>' +
-    '<rect x="11" y="2" width="5" height="5" rx="1"/>' +
-    '<rect x="2" y="11" width="5" height="5" rx="1"/>' +
-    '<rect x="11" y="11" width="5" height="5" rx="1"/>' +
-    '</svg>';
+
+function openPicker() {
+  state.pickerOpen = true;
+  stopCycleTimer();
+  invalidate("overlay");
 }
- 
-// --- Utility ---
-function el(tag, className) {
-  const e = document.createElement(tag);
-  if (className) e.className = className;
-  return e;
+
+function closePicker() {
+  state.pickerOpen = false;
+  if (shell.picker.dialog.open) shell.picker.dialog.close();
+  startCycleTimer();
+}
+
+function paintPicker() {
+  const p = shell.picker;
+
+  if (!state.pickerOpen) {
+    if (p.dialog.open) p.dialog.close();
+    return;
+  }
+
+  const label = state.category.charAt(0).toUpperCase() + state.category.slice(1, -1);
+  p.title.textContent = "Pick a " + label;
+  paintPickerGrid(p.grid, p.input.value);
+
+  if (!p.dialog.open) {
+    p.dialog.showModal();
+    p.input.focus();
+  }
+}
+
+function paintPickerGrid(container, query) {
+  const q = (query || "").trim().toLowerCase();
+  const items = getPickerItems().filter(function (x) {
+    return !q || x.name.toLowerCase().includes(q);
+  });
+
+  const cells = items.map(function (item) {
+    const isPinned = state.pinnedId === item.id;
+
+    // A div, not a button: the pin control is a button, and a button inside a
+    // button is invalid HTML that parsers are free to hoist out of the tree.
+    const cell = el("div", "pickerCell" + (isPinned ? " pickerCellPinned" : ""));
+    cell.setAttribute("role", "option");
+    cell.setAttribute("aria-selected", isPinned ? "true" : "false");
+    cell.tabIndex = 0;
+    cell.title = item.name;
+
+    const choose = function () {
+      jumpToId(item.id);
+      closePicker();
+      invalidate("header", "main");
+    };
+    cell.addEventListener("click", choose);
+    cell.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        choose();
+      }
+    });
+
+    cell.appendChild(img(item.iconUrl, "", "pickerIcon"));
+    cell.appendChild(el("div", "pickerName", item.name));
+
+    const pinRow = el("div", "pickerPinRow");
+    pinRow.appendChild(el("span", "pickerPinText", isPinned ? "Pinned" : "Pin"));
+    pinRow.appendChild(button("btn btnMini" + (isPinned ? " btnPin" : ""), "📌",
+      function (e) {
+        e.stopPropagation();
+        state.pinnedId = state.pinnedId === item.id ? null : item.id;
+        state.pinned = !!state.pinnedId;
+        jumpToId(item.id);
+        paintPickerGrid(container, query);
+        invalidate("header", "main", "footer");
+        startCycleTimer();
+      }));
+    cell.appendChild(pinRow);
+
+    return cell;
+  });
+
+  if (cells.length === 0) {
+    replaceChildren(container, el("div", "pickerEmpty", "No matches"));
+    return;
+  }
+  replaceChildren(container, ...cells);
+}
+
+// --- Keyboard --------------------------------------------------------------
+
+function setupGlobalKeys() {
+  document.addEventListener("keydown", function (e) {
+    if (shell.picker.dialog.open) return; // the dialog handles its own keys
+    if (e.target instanceof HTMLInputElement) return;
+
+    if (e.key === "ArrowRight") { onNext(); return; }
+    if (e.key === "ArrowLeft") { onPrev(); return; }
+    if (e.key === "r" || e.key === "R") { onRefresh(); return; }
+    if (e.key === "p" || e.key === "P") { onTogglePin(); }
+  });
 }

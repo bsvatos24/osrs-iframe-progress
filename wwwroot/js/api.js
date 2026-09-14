@@ -10,7 +10,7 @@
 //     real (if stale) numbers instead of showing nothing or, worse, fake data
 // ============================================================
 
-const HISCORES_ENDPOINT = "https://osrs-highscore-proxy.bensvatos.workers.dev/";
+export const HISCORES_ENDPOINT = "https://osrs-highscore-proxy.bensvatos.workers.dev/";
 const REQUEST_TIMEOUT_MS = 8000;
 const RETRY_DELAY_MS = 1200;
 const CACHE_PREFIX = "osrsgim.hiscores.";
@@ -102,7 +102,7 @@ async function requestHiscores(player, externalSignal) {
 
 // Fetch one player. Retries once on a transient failure. Throws on final
 // failure so callers can decide between an error state and cached data.
-async function fetchHiscores(player, signal) {
+export async function fetchHiscores(player, signal) {
   try {
     const data = await requestHiscores(player, signal);
     writeHiscoresCache(player, data);
@@ -122,7 +122,7 @@ async function fetchHiscores(player, signal) {
 
 // Fetch one player, falling back to cached data rather than failing outright.
 // Always resolves to a uniform result so views can render a per-player state.
-async function loadPlayer(player, signal) {
+export async function loadPlayer(player, signal) {
   try {
     const data = await fetchHiscores(player, signal);
     return { player: player, data: data, fetchedAt: Date.now(), stale: false, error: null };
@@ -150,6 +150,6 @@ async function loadPlayer(player, signal) {
 
 // Fetch many players concurrently. Five serial round-trips through the Worker
 // was the single slowest thing in the app.
-function loadPlayers(players, signal) {
+export function loadPlayers(players, signal) {
   return Promise.all(players.map(function (p) { return loadPlayer(p, signal); }));
 }
