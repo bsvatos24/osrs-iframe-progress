@@ -956,3 +956,32 @@ select.input optgroup{
   background-color: rgba(255, 255, 255, 0.30);
 }
 
+
+/* Data-freshness + per-panel failure states (Phase A) */
+.staleTag{
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dim);
+  letter-spacing: .02em;
+}
+
+.gimLoading{
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.gimPanelError{
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+}

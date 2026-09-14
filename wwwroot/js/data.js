@@ -70,6 +70,10 @@ const BOSS_NAMES = new Set([
   "Zulrah"
 ]);
  
+// Timing. Phase C makes these configurable per widget slot via query string.
+const CYCLE_INTERVAL_MS = 6000;      // auto-advance the current category
+const REFRESH_INTERVAL_MS = 300000;  // re-poll the hiscores (5 minutes)
+
 // Milestone thresholds
 const SKILL_MILESTONES = [70, 80, 90, 99];
 const KC_MILESTONES = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000, 10000];

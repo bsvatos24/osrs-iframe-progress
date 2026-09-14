@@ -14,11 +14,21 @@ let state = {
   loading: true,
   refreshing: false,
   error: null,
-  lastSelectedId: null
+  lastSelectedId: null,
+  // Freshness of the current player's data, so the UI can admit to being stale
+  // instead of silently showing hours-old numbers as if they were live.
+  fetchedAt: null,
+  stale: false,
+  // GIM results live in state, not in the DOM. Previously any render() while
+  // on the GIM tab replaced the panels with a "Loading GIM..." placeholder
+  // that nothing ever resolved, blanking the tab until you switched away.
+  gim: { results: [], loading: false, loaded: false }
 };
  
 let cycleTimer = null;
+let pollTimer = null;
 let abortController = null;
+let gimAbortController = null;
  
 // --- DOM references (set in init) ---
 let $app;
@@ -29,7 +39,45 @@ document.addEventListener("DOMContentLoaded", function () {
   loadData();
   render();
   setupOutsideClickHandlers();
+  setupVisibilityHandling();
+  startPollTimer();
 });
+
+// --- Polling ---
+// An always-on display that only fetches at startup shows whatever the XP was
+// when the PC last woke up. Poll instead, and stop entirely while hidden so a
+// background tab is not rebuilding the DOM and hitting the network forever.
+function startPollTimer() {
+  stopPollTimer();
+  if (REFRESH_INTERVAL_MS <= 0) return;
+  pollTimer = setInterval(function () {
+    if (document.hidden) return;
+    loadData();
+    if (state.category === "gim") loadGimData();
+  }, REFRESH_INTERVAL_MS);
+}
+
+function stopPollTimer() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function setupVisibilityHandling() {
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      stopCycleTimer();
+      stopPollTimer();
+      return;
+    }
+    // Coming back from hidden: the data is by definition suspect.
+    startPollTimer();
+    startCycleTimer();
+    loadData();
+    if (state.category === "gim") loadGimData();
+  });
+}
  
 // --- Data Loading ---
 function loadData() {
@@ -40,9 +88,14 @@ function loadData() {
   if (state.items.length === 0) state.loading = true;
   render();
  
-  fetchHiscores(state.player, abortController.signal)
-    .then(function (data) {
-      const mapped = mapHiscoresToDisplayItems(data);
+  loadPlayer(state.player, abortController.signal)
+    .then(function (result) {
+      state.fetchedAt = result.fetchedAt;
+      state.stale = result.stale;
+      state.error = result.data ? null : result.error;
+      if (!result.data) return;
+
+      const mapped = mapHiscoresToDisplayItems(result.data);
       state.items = mapped;
  
       // Preserve selection
@@ -63,7 +116,7 @@ function loadData() {
       }
     })
     .catch(function (e) {
-      if (e.name === "AbortError") return;
+      if (e.name === "AbortError" || e.name === "TimeoutError") return;
       state.error = e.message || "Unknown error";
     })
     .finally(function () {
@@ -106,13 +159,20 @@ function startCycleTimer() {
   stopCycleTimer();
   if (state.category === "total" || state.category === "gim") return;
   if (state.pinned || state.pinnedId) return;
+  // The picker is rebuilt by render(), so cycling while it is open wipes the
+  // search box and its focus mid-typing.
+  if (state.pickerOpen) return;
+  if (document.hidden) return;
+  if (CYCLE_INTERVAL_MS <= 0) return;
   const filtered = getFiltered();
   if (filtered.length <= 1) return;
  
   cycleTimer = setInterval(function () {
-    state.index = (state.index + 1) % getFiltered().length;
+    const filtered = getFiltered();
+    if (filtered.length === 0) return;
+    state.index = (state.index + 1) % filtered.length;
     render();
-  }, 6000);
+  }, CYCLE_INTERVAL_MS);
 }
  
 function stopCycleTimer() {
@@ -126,6 +186,7 @@ function stopCycleTimer() {
 function onRefresh() {
   state.refreshing = true;
   loadData();
+  if (state.category === "gim") loadGimData();
 }
  
 function setCategory(cat) {
@@ -134,7 +195,7 @@ function setCategory(cat) {
   state.pickerOpen = false;
   render();
   startCycleTimer();
-  if (cat === "gim") loadGimView();
+  if (cat === "gim" && !state.gim.loaded) loadGimData();
 }
  
 function jumpToId(id) {
@@ -164,12 +225,14 @@ function onTogglePin() {
  
 function onPickerOpen() {
   state.pickerOpen = true;
+  stopCycleTimer();
   render();
 }
  
 function onPickerClose() {
   state.pickerOpen = false;
   render();
+  startCycleTimer();
 }
  
 function onPickerSelect(id) {
@@ -212,6 +275,7 @@ function setupOutsideClickHandlers() {
       if (state.pickerOpen) {
         state.pickerOpen = false;
         render();
+        startCycleTimer();
       }
     }
   });
@@ -308,6 +372,13 @@ function renderHeader(current) {
     }
     itemRow.appendChild(title);
     center.appendChild(itemRow);
+
+    if (state.stale && state.fetchedAt) {
+      const staleTag = el("div", "staleTag");
+      staleTag.textContent = "as of " + formatClock(state.fetchedAt);
+      staleTag.title = state.error || "Refresh failed - showing cached data";
+      center.appendChild(staleTag);
+    }
   }
  
   header.appendChild(center);
@@ -335,8 +406,7 @@ function renderMain(current) {
     const section = el("section", "card full cardTotal");
     section.style.width = "100%";
     section.style.height = "100%";
-    section.id = "gimContainer";
-    section.textContent = "Loading GIM\u2026";
+    section.appendChild(renderGimLayout());
     main.appendChild(section);
     return main;
   }
@@ -726,136 +796,143 @@ function renderTotalGrid() {
 }
  
 // --- GIM View ---
-function loadGimView() {
-  const container = document.getElementById("gimContainer");
-  if (!container) return;
- 
-  container.textContent = "Loading GIM\u2026";
- 
-  (async function () {
-    const results = [];
-    for (const p of GIM_PLAYERS) {
-      try {
-        const data = await fetchHiscores(p.name);
-        results.push({ name: p.name, data: data, ok: true });
-      } catch (e) {
-        results.push({ name: p.name, data: fallbackHiscores(p.name), ok: false });
-      }
-    }
- 
-    container.textContent = "";
-    const layout = el("div", "gimLayout");
- 
-    GIM_PLAYERS.forEach(function (slot, i) {
-      const playerData = results.find(function (r) { return r.name === slot.name; });
-      const slotDiv = el("div", "gimSlot " + slot.pos);
-      slotDiv.appendChild(renderGimPanel(
-        slot.name,
-        playerData ? playerData.data : fallbackHiscores(slot.name),
-        playerData ? playerData.ok : false
-      ));
-      layout.appendChild(slotDiv);
+// Loads every member concurrently. Each member resolves to its own result so a
+// single failure degrades one panel instead of the whole view - and never gets
+// replaced with invented level-1 data.
+function loadGimData() {
+  if (gimAbortController) gimAbortController.abort();
+  gimAbortController = new AbortController();
+
+  state.gim.loading = true;
+  render();
+
+  const names = GIM_PLAYERS.map(function (slot) { return slot.name; });
+
+  loadPlayers(names, gimAbortController.signal)
+    .then(function (results) {
+      state.gim.results = results;
+      state.gim.loaded = true;
+    })
+    .catch(function (e) {
+      if (e.name === "AbortError" || e.name === "TimeoutError") return;
+      state.gim.results = [];
+    })
+    .finally(function () {
+      state.gim.loading = false;
+      render();
     });
- 
-    container.appendChild(layout);
-  })();
 }
- 
-function renderGimPanel(name, hiscores, ok) {
-  const isFallback = !ok;
-  const byName = new Map(
-    (isFallback ? [] : hiscores.skills).map(function (s) { return [s.name, s]; })
-  );
- 
-  let totalLevel = 0;
-  let totalXp = 0;
-  const allSkills = GIM_SKILL_ORDER.flat();
- 
-  allSkills.forEach(function (skill) {
-    if (isFallback) {
-      if (skill === "Hitpoints") { totalLevel += 10; totalXp += 1154; }
-      else { totalLevel += 1; }
-    } else {
-      const s = byName.get(skill);
-      totalLevel += (s ? s.level : 1);
-      totalXp += (s ? s.xp : 0);
-    }
+
+function renderGimLayout() {
+  if (state.gim.loading && !state.gim.loaded) {
+    const msg = el("div", "gimLoading");
+    msg.textContent = "Loading GIM\u2026";
+    return msg;
+  }
+
+  const byName = new Map(state.gim.results.map(function (r) { return [r.player, r]; }));
+  const layout = el("div", "gimLayout");
+
+  GIM_PLAYERS.forEach(function (slot) {
+    const slotDiv = el("div", "gimSlot " + slot.pos);
+    slotDiv.appendChild(renderGimPanel(slot.name, byName.get(slot.name)));
+    layout.appendChild(slotDiv);
   });
- 
+
+  return layout;
+}
+
+function renderGimPanel(name, result) {
   const panel = el("div", "gimPanel");
- 
-  // Header
+
   const header = el("div", "gimPanelHeader");
   const nameEl = el("div", "gimPanelName");
   nameEl.textContent = name;
   header.appendChild(nameEl);
-  if (isFallback) {
+
+  if (result && result.stale) {
     const tag = el("div", "gimPanelTag");
-    tag.textContent = "Fallback";
+    tag.textContent = "as of " + formatClock(result.fetchedAt);
+    tag.title = result.error || "Showing cached data";
     header.appendChild(tag);
   }
   panel.appendChild(header);
- 
-  // Skills grid
+
+  // No data at all: say so. Showing every skill at level 1 misrepresents a
+  // teammate's account as a fresh one over what is usually a transient blip.
+  if (!result || !result.data) {
+    const err = el("div", "gimPanelError");
+    err.textContent = result && result.error ? result.error : "No data";
+    panel.appendChild(err);
+    return panel;
+  }
+
+  const byName = new Map(
+    result.data.skills.map(function (s) { return [s.name, s]; })
+  );
+  const allSkills = GIM_SKILL_ORDER.flat();
+
   const grid = el("div", "gimSkillsGrid");
   grid.style.setProperty("--gim-cols", "8");
- 
+
   allSkills.forEach(function (skill) {
-    let level, xp;
-    if (isFallback) {
-      level = skill === "Hitpoints" ? 10 : 1;
-      xp = skill === "Hitpoints" ? 1154 : 0;
-    } else {
-      const s = byName.get(skill);
-      level = s ? s.level : 1;
-      xp = s ? s.xp : 0;
-    }
- 
+    const s = byName.get(skill);
+    const level = Math.max(1, (s && s.level > 0 ? s.level : 1));
+    const xp = s && s.xp > 0 ? s.xp : 0;
+
     const curLevelXp = xpForLevel(level);
     const nextLevelXp = xpForLevel(Math.min(126, level + 1));
     const inLevel = Math.max(0, xp - curLevelXp);
     const needed = Math.max(1, nextLevelXp - curLevelXp);
     const pct = clamp((inLevel / needed) * 100, 0, 100);
- 
+
     const cell = el("div", "gimSkillCell");
- 
+
     const top = el("div", "gimSkillTop");
     const icon = document.createElement("img");
     icon.className = "gimSkillIcon";
-    icon.src = "wwwroot/icons/skills/" + slug(skill) + ".png";
+    icon.src = iconForSkill(skill);
     icon.alt = skill;
     top.appendChild(icon);
- 
+
     const lvl = el("div", "gimSkillLvl");
     lvl.textContent = level;
     top.appendChild(lvl);
     cell.appendChild(top);
- 
+
     const barTrack = el("div", "gimSkillBarTrack");
     const barFill = el("div", "gimSkillBarFill");
     barFill.style.width = pct + "%";
-    barFill.style.background = gradientColor(pct);
+    barFill.style.background = pctToColor(pct / 100);
     barTrack.appendChild(barFill);
     cell.appendChild(barTrack);
- 
+
     grid.appendChild(cell);
   });
- 
+
   panel.appendChild(grid);
- 
-  // Totals
-  const totals = el("div", "gimTotals");
+
+  const totals = skillTotals(result.data);
+  const totalsRow = el("div", "gimTotals");
+
   const left = el("div", "gimTotalsLeft");
-  left.innerHTML = "Total level: <span>" + totalLevel.toLocaleString() + "</span>";
-  totals.appendChild(left);
+  left.appendChild(document.createTextNode("Total level: "));
+  const leftVal = document.createElement("span");
+  leftVal.textContent = totals.level.toLocaleString();
+  left.appendChild(leftVal);
+  totalsRow.appendChild(left);
+
   const right = el("div", "gimTotalsRight");
-  right.innerHTML = "Total xp: <span>" + totalXp.toLocaleString() + "</span>";
-  totals.appendChild(right);
-  panel.appendChild(totals);
- 
+  right.appendChild(document.createTextNode("Total xp: "));
+  const rightVal = document.createElement("span");
+  rightVal.textContent = totals.xp.toLocaleString();
+  right.appendChild(rightVal);
+  totalsRow.appendChild(right);
+
+  panel.appendChild(totalsRow);
   return panel;
 }
- 
+
 // --- Picker Modal ---
 function renderPickerModal() {
   const overlay = el("div", "modalOverlay");

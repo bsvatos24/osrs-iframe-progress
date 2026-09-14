@@ -56,6 +56,12 @@ function fmt(n) {
   return Math.max(0, n).toLocaleString();
 }
  
+// Short local time for "as of HH:MM" staleness stamps.
+function formatClock(ts) {
+  if (!ts) return "unknown";
+  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+ 
 function formatRank(rank) {
   if (rank == null || rank < 0) return "Unranked";
   return "#" + rank.toLocaleString();
@@ -99,13 +105,27 @@ function segmentFillPct(current, from, to) {
   return clamp(((current - from) / (to - from)) * 100, 0, 100);
 }
  
+// The hiscores use -1 to mean "not ranked". Left raw it corrupts arithmetic:
+// unranked skills subtract XP from the Total tab, and `score || 0` does not
+// catch -1 because -1 is truthy. Normalise at the model boundary instead, and
+// keep an explicit `ranked` flag for anything that wants to render it.
+function rankedValue(n) {
+  return typeof n === "number" && n > 0 ? n : 0;
+}
+
+function isRanked(rank) {
+  return typeof rank === "number" && rank > 0;
+}
+
 // Map hiscores API response to display items
 function mapHiscoresToDisplayItems(data) {
+  if (!data || !Array.isArray(data.skills)) return [];
+
   const skills = data.skills
     .filter(function (s) { return s.name !== "Overall"; })
     .map(function (s) {
-      const currentLevel = s.level;
-      const currentXp = s.xp;
+      const currentLevel = Math.max(1, rankedValue(s.level) || 1);
+      const currentXp = rankedValue(s.xp);
       const curLevelXp = xpForLevel(currentLevel);
       const nextLevelXp = xpForLevel(Math.min(126, currentLevel + 1));
       const inLevel = Math.max(0, currentXp - curLevelXp);
@@ -113,21 +133,21 @@ function mapHiscoresToDisplayItems(data) {
       const pct = clamp((inLevel / needed) * 100, 0, 100);
       const xp99 = xpForLevel(99);
       const pct99 = clamp((currentXp / xp99) * 100, 0, 100);
- 
+
       return {
         id: "skill-" + s.id,
         category: "skills",
         name: s.name,
         iconUrl: iconForSkill(s.name),
+        ranked: isRanked(s.rank),
+        rank: rankedValue(s.rank),
         primaryCurrent: inLevel,
         primaryTarget: needed,
         primaryLabelTop: pct.toFixed(0) + "% Complete",
-        primaryLabelBottom: formatCompact(inLevel) + " / " + formatCompact(needed),
         secondaryType: "gauge",
         secondaryCurrent: currentXp,
         secondaryTarget: xp99,
         secondaryLabelTop: pct99.toFixed(0) + "% to 99",
-        secondaryLabelBottom: formatCompact(currentXp) + " / " + formatCompact(xp99) + " XP",
         milestones: SKILL_MILESTONES,
         milestoneCurrent: currentLevel,
         milestoneUnit: "level",
@@ -136,49 +156,52 @@ function mapHiscoresToDisplayItems(data) {
         levelProgressPct: pct
       };
     });
- 
+
   const bosses = [];
   const activities = [];
- 
-  for (const a of data.activities) {
-    const kills = a.score || 0;
+
+  for (const a of (data.activities || [])) {
+    const kills = rankedValue(a.score);
     const ms = KC_MILESTONES;
     const next = nextMilestone(kills, ms);
     const prev = prevMilestone(kills, ms);
     const span = Math.max(1, next - prev);
     const inSeg = Math.max(0, kills - prev);
- 
+
     const item = {
       id: "act-" + a.id,
       category: BOSS_NAMES.has(a.name) ? "bosses" : "activities",
       name: a.name,
       iconUrl: iconForActivity(a.name),
+      ranked: isRanked(a.rank),
+      rank: rankedValue(a.rank),
+      kills: kills,
       primaryCurrent: inSeg,
       primaryTarget: span,
       primaryLabelTop: "Next Milestone: " + next,
-      primaryLabelBottom: formatCompact(kills) + " KC",
       secondaryType: "rank",
       secondaryLabelTop: "Rank",
-      secondaryCurrent: a.rank,
+      secondaryCurrent: isRanked(a.rank) ? a.rank : -1,
       milestones: ms,
       milestoneCurrent: kills,
       milestoneUnit: "kills"
     };
- 
+
     if (item.category === "bosses") bosses.push(item);
     else activities.push(item);
   }
- 
+
   return skills.concat(bosses, activities);
 }
- 
-// Create fallback hiscores for GIM when a player can't be fetched
-function fallbackHiscores(name) {
-  return {
-    name: name,
-    skills: ALL_SKILL_NAMES.map(function (sn, i) {
-      return { id: i + 1, name: sn, rank: -1, level: 1, xp: 1 };
-    }),
-    activities: []
-  };
+
+// Skill totals for a hiscores payload, used by the Total and GIM views.
+function skillTotals(data) {
+  const skills = ((data && data.skills) || []).filter(function (s) {
+    return s.name !== "Overall";
+  });
+  return skills.reduce(function (acc, s) {
+    acc.level += Math.max(1, rankedValue(s.level) || 1);
+    acc.xp += rankedValue(s.xp);
+    return acc;
+  }, { level: 0, xp: 0 });
 }
