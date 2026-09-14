@@ -65,8 +65,12 @@ export const CATEGORIES = [
   { id: "bosses", label: "Bosses" },
   { id: "activities", label: "Activities" },
   { id: "total", label: "Total" },
-  { id: "gim", label: "GIM" }
+  { id: "gim", label: "GIM" },
+  { id: "team", label: "Team" }
 ];
+
+// Views that need every member's hiscores rather than just the selected one.
+export const TEAM_CATEGORIES = new Set(["gim", "team"]);
 
 // Categories that show a single cycling item rather than an aggregate view.
 export const ITEM_CATEGORIES = new Set(["skills", "bosses", "activities"]);

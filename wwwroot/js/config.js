@@ -15,6 +15,7 @@
 //   &chrome=0|1              hide all controls (pure display widget)
 //   &bucket=xl|l|m|tall      force a layout bucket (debugging/override)
 //   &gim=panels|cycle|summary
+//   &all=1                   include bosses/activities with no kills
 //   &theme=ef50e7            accent colour, hex without the hash
 // ============================================================
 
@@ -22,7 +23,7 @@ import { DEFAULT_PLAYER, PLAYER_OPTIONS } from "./constants.js";
 
 const params = new URLSearchParams(window.location.search);
 const MODE_KEY = "osrsgim.mode";
-const VIEWS = new Set(["skills", "bosses", "activities", "total", "gim"]);
+const VIEWS = new Set(["skills", "bosses", "activities", "total", "gim", "team"]);
 const BUCKETS = new Set(["xl", "l", "m", "tall"]);
 const GIM_STYLES = new Set(["panels", "cycle", "summary"]);
 
@@ -117,6 +118,12 @@ export const config = {
   refreshMs: seconds("refresh", kiosk ? 300 : 600, 86400),
 
   chrome: flag("chrome", true),
+
+  // The hiscores list ~68 bosses whether or not you have ever killed them. At
+  // 6s each that is a seven-minute loop of mostly empty gauges, so entries
+  // with no kills are hidden unless asked for.
+  showUnkilled: flag("all", false),
+
   bucketOverride: oneOf("bucket", BUCKETS),
   gimStyle: oneOf("gim", GIM_STYLES),
   accentRgb: resolveAccent()

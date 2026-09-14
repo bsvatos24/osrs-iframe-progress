@@ -326,3 +326,41 @@ html[data-bucket="tall"] #app{
   color: var(--muted);
   min-width: 96px;
 }
+
+/* ---------- Team view per bucket -------------------------------------- */
+
+/* Side by side only where there is horizontal room; the view itself omits the
+   second panel at narrower buckets, so these just set the proportions. */
+[data-bucket="xl"] .teamWrap{
+  grid-template-columns: 1.35fr 1fr;
+  gap: 18px;
+}
+
+[data-bucket="l"] .teamWrap{
+  grid-template-columns: 1.15fr 1fr;
+}
+
+/* Two columns of upcoming level-ups fit across the full panel. */
+[data-bucket="xl"] .upcomingList{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+}
+
+[data-bucket="xl"] .teamName,
+[data-bucket="xl"] .teamCell{ font-size: 16px; }
+[data-bucket="xl"] .teamRank{ font-size: 15px; }
+
+/* At M and on phones the gains columns are what get dropped first: total
+   level and XP matter more than a delta when space is tight. */
+[data-bucket="m"] .teamRow,
+[data-bucket="tall"] .teamRow{
+  grid-template-columns: 34px minmax(70px, 1.3fr) minmax(40px, 2fr) auto auto;
+}
+
+[data-bucket="m"] .teamRow > :nth-child(7),
+[data-bucket="tall"] .teamRow > :nth-child(7){
+  display: none;
+}
+
+[data-bucket="tall"] .teamWrap{ overflow: visible; }
+[data-bucket="tall"] .teamTable{ overflow: visible; }

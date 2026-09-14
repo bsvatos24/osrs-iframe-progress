@@ -8,15 +8,19 @@
 
 import { loadPlayer, loadPlayers } from "./api.js";
 import { applyConfigToDocument, config } from "./config.js";
-import { CATEGORIES, GIM_POSITIONS, ITEM_CATEGORIES, SKILL_GRID_ORDER } from "./constants.js";
+import {
+  CATEGORIES, GIM_POSITIONS, ITEM_CATEGORIES, SKILL_GRID_ORDER, TEAM_CATEGORIES
+} from "./constants.js";
 import { gridIcon, iconButton, refreshIcon } from "./components.js";
 import { button, el, img, replaceChildren } from "./dom.js";
 import { formatClock, slug } from "./format.js";
 import { mapHiscoresToDisplayItems } from "./model.js";
 import { getBucket, observeBucket, onBucketChange } from "./mode.js";
 import { invalidate, flush, setPainter, state } from "./store.js";
+import { snapshot } from "./history.js";
 import { renderGimView } from "./views/gim.js";
 import { renderItemView } from "./views/item.js";
+import { renderTeamView } from "./views/team.js";
 import { renderTotalView } from "./views/total.js";
 
 const CYCLE_INTERVAL_MS = config.cycleMs;
@@ -66,7 +70,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   setPainter(paint);
   loadData();
-  if (state.category === "gim") loadGimData();
+  if (TEAM_CATEGORIES.has(state.category)) loadGimData();
   // loadData() only marks header+main dirty; the first paint must cover the
   // whole shell or the footer never gets built.
   invalidate();
@@ -99,6 +103,7 @@ function paint(dirty) {
 function paintMain(current) {
   const bucket = getBucket();
   const view = state.category === "gim" ? renderGimView(state, bucket, ROSTER)
+    : state.category === "team" ? renderTeamView(state, bucket, ROSTER)
     : state.category === "total" ? renderTotalView(state)
     : renderItemView(Object.assign({ current: current, bucket: bucket }, state));
 
@@ -123,6 +128,7 @@ function loadData() {
       state.error = result.data ? null : result.error;
       if (!result.data) return;
 
+      snapshot(state.player, result.data);
       state.items = mapHiscoresToDisplayItems(result.data);
       applyItemSlug();
       preserveSelection();
@@ -175,6 +181,10 @@ function loadGimData() {
 
   loadPlayers(ROSTER.map(function (m) { return m.name; }), gimAbortController.signal)
     .then(function (results) {
+      // Only fresh reads anchor a day; a cached payload would backdate it.
+      results.forEach(function (r) {
+        if (r.data && !r.stale) snapshot(r.player, r.data);
+      });
       state.gim.results = results;
       state.gim.loaded = true;
     })
@@ -197,7 +207,15 @@ function isAbort(err) {
 
 function getFiltered() {
   if (!ITEM_CATEGORIES.has(state.category)) return [];
-  return state.items.filter(function (i) { return i.category === state.category; });
+  return state.items.filter(function (i) {
+    if (i.category !== state.category) return false;
+    // Cycling through 68 bosses you have never killed is a seven-minute loop
+    // of empty gauges. A pinned entry always stays visible.
+    if (!config.showUnkilled && i.milestoneUnit === "kills" && i.kills <= 0) {
+      return i.id === state.pinnedId;
+    }
+    return true;
+  });
 }
 
 function getCurrent() {
@@ -210,7 +228,11 @@ function getPickerItems() {
     const byName = new Map(filtered.map(function (s) { return [s.name, s]; }));
     return SKILL_GRID_ORDER.map(function (n) { return byName.get(n); }).filter(Boolean);
   }
-  return filtered.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+  // Busiest first is more useful than alphabetical for kill counts.
+  return filtered.slice().sort(function (a, b) {
+    if (b.kills !== a.kills) return b.kills - a.kills;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 // --- Timers ----------------------------------------------------------------
@@ -274,7 +296,7 @@ function stopPollTimer() {
 
 function refreshAll() {
   loadData();
-  if (state.category === "gim") loadGimData();
+  if (TEAM_CATEGORIES.has(state.category)) loadGimData();
 }
 
 function setupVisibilityHandling() {
@@ -305,7 +327,7 @@ function setCategory(cat) {
   state.index = 0;
   invalidate();
   startCycleTimer();
-  if (cat === "gim" && !state.gim.loaded && !state.gim.loading) loadGimData();
+  if (TEAM_CATEGORIES.has(cat) && !state.gim.loaded && !state.gim.loading) loadGimData();
 }
 
 function onPrev() {
@@ -360,8 +382,9 @@ function buildHeaderActions() {
 function buildHeaderCenter(current) {
   const center = el("div", "headerCenter");
 
-  if (state.category === "gim") {
-    center.appendChild(el("div", "headerGimOnly", "GIM Levels"));
+  if (state.category === "gim" || state.category === "team") {
+    center.appendChild(el("div", "headerGimOnly",
+      state.category === "gim" ? "GIM Levels" : "Team Standings"));
     return center;
   }
 

@@ -299,3 +299,193 @@
 }
 
 .gimTotals span{ color: var(--text); font-weight: 900; }
+
+/* --- Team view ------------------------------------------------------- */
+
+.cardTeam{
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.teamWrap{
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.teamPanel{
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teamPanelTitle{
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.teamTable{
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+
+.teamRow{
+  flex: 1 1 auto;
+  min-height: 44px;
+  max-height: 76px;
+  display: grid;
+  grid-template-columns: 40px minmax(80px, 1.4fr) minmax(60px, 3fr)
+                         minmax(56px, auto) minmax(56px, auto)
+                         minmax(64px, auto) minmax(64px, auto);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  border-radius: var(--radius-tile);
+  padding: 8px 12px;
+}
+
+.teamRowHead{
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+  border-color: transparent;
+  background: transparent;
+  padding-block: 0;
+  font-size: 11px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.teamRowHead .teamCell,
+.teamRowHead .teamName{ font-weight: 700; font-size: 11px; }
+.teamBarHead{ border: 0; background: transparent; height: auto; }
+
+.teamRank{
+  font-weight: 900;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.teamName{
+  font-weight: 800;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teamBar{
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+
+.teamBarFill{
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+
+.teamCell{
+  font-weight: 900;
+  font-size: 14px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.teamXp{ font-weight: 700; color: var(--muted); }
+.teamGain{ font-weight: 800; font-size: 13px; }
+.teamGainPositive{ color: #6ee7a0; }
+.teamGainEmpty{ color: var(--dim); font-weight: 700; }
+
+.teamNote{
+  font-size: 11px;
+  color: var(--dim);
+  line-height: 1.5;
+}
+
+.teamEmpty{
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  font-weight: 700;
+}
+
+/* --- About to level -------------------------------------------------- */
+
+.upcomingList{
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  overflow: auto;
+  align-content: start;
+}
+
+.upcomingRow{
+  display: grid;
+  grid-template-columns: 22px minmax(110px, 1.2fr) minmax(50px, 1fr) 56px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.upcomingIcon{ width: 20px; height: 20px; }
+
+.upcomingLabel{ min-width: 0; }
+
+.upcomingSkill{
+  font-weight: 800;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.upcomingPlayer{
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.upcomingBar{
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+
+.upcomingBarFill{ height: 100%; border-radius: var(--radius-pill); }
+
+.upcomingRemaining{
+  font-weight: 800;
+  font-size: 12px;
+  text-align: right;
+  color: var(--muted);
+}

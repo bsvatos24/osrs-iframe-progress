@@ -16,6 +16,7 @@ consumers from one deploy:
 | Activities | Same as Bosses, for minigames, clue scrolls and points tables |
 | Total | All 24 skills with level and intra-level progress, plus total level and XP |
 | GIM | Every team member's skills side by side with their totals |
+| Team | Standings ranked by total level, with XP gained today and over 7 days, plus an "about to level" board of the level-ups nearest across the whole team |
 
 In kiosk mode the current category auto-cycles every 6 seconds; **Pin** freezes
 it, the grid button opens a searchable picker, and the player dropdown switches
@@ -79,7 +80,7 @@ drive several different widget slots without a code change per slot.
 |---|---|---|
 | `player` | `BenjiFresh91` | starting player |
 | `players` | the `TEAM` roster | comma-separated roster override |
-| `view` | `skills` | `skills`/`bosses`/`activities`/`total`/`gim` |
+| `view` | `skills` | `skills`/`bosses`/`activities`/`total`/`gim`/`team` |
 | `item` | - | slug to pin to, e.g. `slayer`, `zulrah` |
 | `cycle` | 6 (kiosk), 0 (web) | seconds per auto-cycle step; 0 is off |
 | `refresh` | 300 (kiosk), 600 (web) | seconds between polls; 0 is off |
@@ -87,6 +88,7 @@ drive several different widget slots without a code change per slot.
 | `chrome` | `1` | `0` hides all controls - a pure display widget |
 | `bucket` | auto | force `xl`/`l`/`m`/`tall` (debugging) |
 | `gim` | auto by bucket | `panels`/`cycle`/`summary` |
+| `all` | `0` | `1` includes bosses/activities with no kills |
 | `theme` | `ef50e7` | accent colour, hex without the `#` |
 
 ## Embedding on the XENEON EDGE
@@ -106,7 +108,8 @@ the live widget.
 ### Example slot setups
 
 ```
-?view=gim&chrome=0                      full team board, no controls
+?view=team&chrome=0                     standings, gains and what is about to level
+?view=gim&chrome=0                      full team skill grid, no controls
 ?view=skills&item=slayer&chrome=0       one always-on gauge for the current grind
 ?view=gim&gim=summary&chrome=0          compact five-row team leaderboard
 ?view=total                             one interactive slot, controls on
@@ -116,6 +119,25 @@ the live widget.
 
 Touch: swipe left/right to change item, up/down to change tab.
 Keyboard: arrow keys to change item, `R` to refresh, `P` to pin.
+
+## Progress history
+
+The hiscores are point-in-time only: they say what you have, never what you
+gained. The app stores one snapshot per player per day in `localStorage` and
+diffs against it, which is what powers the Team view's "today" and "7 days"
+columns.
+
+The **first** observation of each day is kept and never overwritten - that is
+what makes "gained today" mean anything; overwriting on each poll would leave
+the delta permanently at zero. Only fresh reads anchor a day, so a cached
+payload cannot backdate one. History is per-browser, so it starts from the day
+that browser first opened the page and a teammate's phone has its own.
+
+This sits behind a deliberately narrow interface (`snapshot` / `gains` in
+`history.js`) so it can be replaced by [Wise Old Man](https://docs.wiseoldman.net/)'s
+server-side group history - shared across everyone, with records and
+competitions - without touching the views. That would be the natural next step,
+proxied through the existing Worker with the API key server-side.
 
 ## Data source
 
@@ -143,11 +165,12 @@ wwwroot/js/
   osrs.js               precomputed XP table, level and milestone maths
   format.js             number/rank/clock formatting, icon paths, colour ramp
   model.js              hiscores payload -> uniform display items
+  history.js            daily localStorage snapshots -> XP gained
   api.js                fetch with timeout, retry and cache
   store.js              state plus batched, region-scoped render scheduling
   dom.js                small element helpers
   components.js         reusable UI pieces
-  views/                item.js, total.js, gim.js
+  views/                item.js, total.js, gim.js, team.js
   app.js                shell, wiring and timers
 wwwroot/icons/          skill and activity icons (PNG, named by slug)
 ```
