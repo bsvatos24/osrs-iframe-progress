@@ -96,17 +96,36 @@ drive several different widget slots without a code change per slot.
 
 ## Embedding on the XENEON EDGE
 
-Open **`embed.html`** on the deployed site. It previews the dashboard at each
+Open **`setup.html`** on the deployed site. It previews the dashboard at each
 iCUE slot size (M 840x696, L 1688x696, XL 2536x696), lets you pick the view and
-options, and emits the snippet to paste into the iCUE **IFRAME** widget:
+options, and emits the snippet to paste into the iCUE **IFRAME** widget.
+
+`setup.html` is a tool, **not** the page you embed — the snippet it generates
+always points at `index.html`:
 
 ```html
-<iframe src="https://<your-pages-url>/index.html?view=gim&mode=kiosk&chrome=0"
+<iframe src="https://<your-pages-url>/index.html?view=gim&mode=kiosk"
         width="100%" height="100%" frameborder="0"></iframe>
 ```
 
-`embed.html` is also the way to check all three slot layouts without swapping
-the live widget.
+It is also the way to check all three slot layouts without swapping the live
+widget. (`embed.html` redirects here; the old name read as "the page you
+embed", which it never was.)
+
+### Keep the tab bar
+
+`chrome=0` hides **all** controls — the tab bar, Pin/Prev/Next and the player
+menu — for a pure display widget. Leave it off if you want to change tabs by
+touch:
+
+```
+?view=gim&mode=kiosk              tab bar visible
+?view=gim&mode=kiosk&chrome=0     no controls at all
+```
+
+Either way the screen stays navigable by gesture: swipe up/down to change tab,
+left/right to change item. So `chrome=0` costs you the buttons, not the
+navigation.
 
 ### Example slot setups
 

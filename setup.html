@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Widget setup - OSRS Progress Dashboard</title>
+  <link rel="icon" href="wwwroot/icons/skills/total.png" />
+  <style>
+    :root{
+      --bg:#0b0b0d; --panel:#141418; --line:rgba(255,255,255,.14);
+      --text:#fff; --muted:rgba(255,255,255,.62); --accent:#ef50e7;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+      padding:24px 16px;
+    }
+    h1{ font-size:20px; margin:0 0 4px; }
+    .sub{ color:var(--muted); font-size:13px; margin:0 0 20px; }
+    .wrap{ max-width:2600px; margin:0 auto; }
+    fieldset{
+      border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+      margin:0 0 16px; background:var(--panel);
+    }
+    legend{ font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); padding:0 6px; }
+    .row{ display:flex; flex-wrap:wrap; gap:16px 22px; align-items:flex-end; }
+    label{ display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--muted); }
+    select,input{
+      background:#1d1d22; color:var(--text); border:1px solid var(--line);
+      border-radius:8px; padding:8px 10px; font:inherit; min-width:150px;
+    }
+    input[type=checkbox]{ min-width:0; width:18px; height:18px; accent-color:var(--accent); }
+    .inline{ flex-direction:row; align-items:center; gap:8px; }
+    code, .snippet{
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
+    }
+    .snippet{
+      width:100%; background:#1d1d22; border:1px solid var(--line); border-radius:8px;
+      padding:10px 12px; color:#8ef;
+    }
+    button{
+      background:var(--accent); color:#111; border:0; border-radius:8px;
+      padding:9px 14px; font:inherit; font-weight:700; cursor:pointer;
+    }
+    .slotTabs{ display:flex; gap:8px; flex-wrap:wrap; }
+    .slotTab{
+      background:#1d1d22; color:var(--text); border:1px solid var(--line);
+      font-weight:600; padding:8px 12px;
+    }
+    .slotTab[aria-pressed="true"]{ background:var(--accent); color:#111; border-color:transparent; }
+    .stage{ overflow:auto; padding-bottom:8px; }
+    .frameBox{
+      border:1px solid var(--accent); border-radius:6px; overflow:hidden;
+      background:#000; flex:0 0 auto;
+    }
+    iframe{ display:block; border:0; }
+    .dims{ font-size:12px; color:var(--muted); margin:8px 0 4px; }
+    .note{ font-size:12px; color:var(--muted); line-height:1.6; margin-top:6px; }
+    .warn{
+      border:1px solid rgba(239,80,231,.5); background:rgba(239,80,231,.10);
+      border-radius:10px; padding:10px 14px; margin:0 0 18px; font-size:13px;
+      line-height:1.6;
+    }
+    .warn code{ background:rgba(0,0,0,.35); padding:1px 5px; border-radius:4px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Widget setup</h1>
+  <p class="sub">
+    Preview the dashboard at the exact iCUE iframe slot sizes, then copy the snippet
+    into the XENEON EDGE <strong>IFRAME</strong> widget.
+  </p>
+
+  <div class="warn">
+    <strong>This page is a tool, not the widget.</strong> Do not put
+    <code>setup.html</code> in the iframe &mdash; you would get these controls on
+    your screen instead of the dashboard. Configure it below and paste the
+    generated snippet, which points at <code>index.html</code>.
+  </div>
+
+  <fieldset>
+    <legend>Slot size</legend>
+    <div class="slotTabs" id="slots"></div>
+    <p class="note" id="slotNote"></p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Widget options</legend>
+    <div class="row">
+      <label>View
+        <select id="view">
+          <option value="skills">Skills</option>
+          <option value="bosses">Bosses</option>
+          <option value="activities">Activities</option>
+          <option value="total">Total</option>
+          <option value="gim">GIM</option>
+          <option value="team">Team</option>
+        </select>
+      </label>
+      <label>Player
+        <select id="player"></select>
+      </label>
+      <label>Pin to one item (slug)
+        <input id="item" type="text" placeholder="e.g. slayer, zulrah" />
+      </label>
+      <label>Cycle seconds (0 = off)
+        <input id="cycle" type="number" min="0" max="600" value="6" />
+      </label>
+      <label>Refresh seconds (0 = off)
+        <input id="refresh" type="number" min="0" max="86400" value="300" />
+      </label>
+      <label>GIM style
+        <select id="gim">
+          <option value="">auto (by slot size)</option>
+          <option value="panels">panels</option>
+          <option value="cycle">one member, cycling</option>
+          <option value="summary">compact summary</option>
+        </select>
+      </label>
+      <label>Accent (hex)
+        <input id="theme" type="text" placeholder="ef50e7" />
+      </label>
+      <label class="inline" title="Removes the tab bar, Pin/Prev/Next and the player menu">
+        <input id="chrome" type="checkbox" /> Hide controls (no tab bar)
+      </label>
+      <label class="inline"><input id="kiosk" type="checkbox" checked /> Kiosk mode</label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Paste into iCUE</legend>
+    <div class="row">
+      <input class="snippet" id="snippet" readonly />
+      <button id="copy" type="button">Copy</button>
+    </div>
+    <p class="note">
+      The base URL is taken from wherever this page is served, so open
+      <code>setup.html</code> from your GitHub Pages URL to get a snippet the
+      Edge can actually load. Served locally it will emit a localhost URL.
+      <br />
+      With <strong>Hide controls</strong> ticked there is no tab bar, but the
+      screen is still touch-navigable: swipe up or down to change tab, left or
+      right to change item.
+    </p>
+  </fieldset>
+
+  <p class="dims" id="dims"></p>
+  <div class="stage"><div class="frameBox" id="frameBox"><iframe id="preview" title="Widget preview"></iframe></div></div>
+</div>
+
+<script type="module">
+  // The roster comes from the app's own constants, so this page cannot drift
+  // out of sync with it.
+  import { PLAYER_OPTIONS } from "./wwwroot/js/constants.js";
+
+  // iCUE offers three iframe slot sizes on the EDGE, all 696px tall.
+  const SLOTS = [
+    { id: "M",  w: 840,  h: 696, note: "M - one third of the screen." },
+    { id: "L",  w: 1688, h: 696, note: "L - two thirds of the screen. This is the current deployment." },
+    { id: "XL", w: 2536, h: 696, note: "XL - the full 2560x720 panel." }
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  let slot = SLOTS[1];
+
+  const playerSelect = $("player");
+  PLAYER_OPTIONS.forEach((name) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    playerSelect.appendChild(opt);
+  });
+
+  const slotTabs = $("slots");
+  SLOTS.forEach((s) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "slotTab";
+    btn.textContent = `${s.id} - ${s.w}x${s.h}`;
+    btn.addEventListener("click", () => { slot = s; update(); });
+    btn.dataset.slot = s.id;
+    slotTabs.appendChild(btn);
+  });
+
+  function buildQuery() {
+    const p = new URLSearchParams();
+    p.set("view", $("view").value);
+    p.set("player", playerSelect.value);
+    p.set("mode", $("kiosk").checked ? "kiosk" : "web");
+
+    const item = $("item").value.trim().toLowerCase();
+    if (item) p.set("item", item);
+
+    // Only emit timings that differ from the kiosk defaults, to keep the
+    // pasted snippet short and readable.
+    const cycle = $("cycle").value;
+    if (cycle !== "" && cycle !== "6") p.set("cycle", cycle);
+    const refresh = $("refresh").value;
+    if (refresh !== "" && refresh !== "300") p.set("refresh", refresh);
+
+    if ($("gim").value) p.set("gim", $("gim").value);
+    if ($("chrome").checked) p.set("chrome", "0");
+
+    const theme = $("theme").value.trim().replace(/^#/, "");
+    if (/^[0-9a-f]{6}$/i.test(theme)) p.set("theme", theme);
+
+    return p.toString();
+  }
+
+  function update() {
+    const base = new URL("index.html", window.location.href).href;
+    const url = base + "?" + buildQuery();
+
+    $("preview").src = url;
+    $("frameBox").style.width = slot.w + "px";
+    $("frameBox").style.height = slot.h + "px";
+    $("preview").width = slot.w;
+    $("preview").height = slot.h;
+    $("dims").textContent = `Preview at ${slot.id} - ${slot.w} x ${slot.h} (actual pixels)`;
+    $("slotNote").textContent = slot.note;
+
+    slotTabs.querySelectorAll(".slotTab").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.slot === slot.id));
+    });
+
+    $("snippet").value =
+      `<iframe src="${url}" width="100%" height="100%" frameborder="0"></iframe>`;
+  }
+
+  document.querySelectorAll("select, input").forEach((node) => {
+    node.addEventListener("input", update);
+    node.addEventListener("change", update);
+  });
+
+  $("copy").addEventListener("click", async () => {
+    const field = $("snippet");
+    try {
+      await navigator.clipboard.writeText(field.value);
+    } catch (e) {
+      field.select();
+      document.execCommand("copy");
+    }
+    const btn = $("copy");
+    btn.textContent = "Copied";
+    setTimeout(() => { btn.textContent = "Copy"; }, 1200);
+  });
+
+  update();
+</script>
+</body>
+</html>
