@@ -231,15 +231,25 @@ entries have no icon file committed.
 
 ### Where the icons come from
 
+The **skill** icons come from
+[RuneLite's `skill_icons/`](https://github.com/runelite/runelite/tree/master/runelite-client/src/main/resources/skill_icons),
+as lossless 25×25 PNGs.
+
 RuneLite is **not** a source for boss art. Its hiscore panel calls
 `spriteManager.getSpriteAsync(skill.getSpriteId(), …)` and reads each icon from
 the running game client's sprite cache by numeric id — the repository contains
-no boss images at all, only account-type badges. Its `skill_icons/` directory
-does hold the 24 skill icons, but they are pixel-identical to the ones already
-committed here.
+no boss images at all, only account-type badges.
 
-So the sprite ids in `hiscore-data.js` are the practical lead for sourcing art
-by hand. The three currently without a file:
+So the boss and activity icons here are still lossy WebP files carrying a
+`.png` extension (82 of 89). That matters more than it sounds for 25×25 pixel
+art: VP8 lossy uses 4:2:0 chroma subsampling, which bleeds colour into flat
+regions and desaturates them. Measured against the lossless originals the skill
+icons were off by a mean of 5–46 per channel, peaking at 212/255 on `magic`, so
+the boss set is presumably similar. Replacing them needs a lossless source —
+the sprite ids in `hiscore-data.js` cover all 71 bosses and are the practical
+lead.
+
+The three with no file at all:
 
 | Boss | Sprite id |
 |---|---|
