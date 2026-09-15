@@ -1,0 +1,419 @@
+/* ==========================================================
+   Dual mode.
+
+   Two orthogonal axes, because "am I in an iframe" and "how much room do I
+   have" are different questions: an M Edge slot (840x696) and a phone
+   (390x844) are both narrow but need opposite layouts.
+
+     [data-mode]   behaviour  - kiosk (ambient, touch, locked) vs web
+     [data-bucket] layout     - xl / l / m / tall, from the container's aspect
+     [data-chrome] controls   - off makes it a pure display widget
+   ========================================================== */
+
+/* ---------- Mode: kiosk ------------------------------------------------ */
+
+/* An always-on touch panel: nothing selects, nothing scrolls the document,
+   nothing shows a tap highlight, and text is sized to be read at a distance. */
+[data-mode="kiosk"]{
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-mode="kiosk"] body{
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+  cursor: default;
+}
+
+[data-mode="kiosk"] .title{ font-size: 20px; }
+[data-mode="kiosk"] .headerPlayer{ font-size: 16px; }
+[data-mode="kiosk"] .gaugeTop{ font-size: 16px; }
+
+/* Touch targets below ~44px are uncomfortable on the panel. */
+[data-mode="kiosk"] .iconBtn{ width: 44px; height: 44px; }
+[data-mode="kiosk"] .btn{ min-height: 44px; padding-inline: 14px; }
+[data-mode="kiosk"] .tab{ min-height: 44px; padding-inline: 16px; }
+[data-mode="kiosk"] .playerMenuItem{ min-height: 44px; }
+
+/* ---------- Mode: web ------------------------------------------------- */
+
+/* A normal page may scroll. Note the selectors: `html` is the element that
+   carries data-mode, so `[data-mode] html` can never match, and `.app` loses
+   to base.css's `#app` on specificity. */
+html[data-mode="web"],
+html[data-mode="web"] body{
+  overflow: auto;
+}
+
+/* ---------- Bucket: m (the narrowest Edge slot, and desktop windows) --- */
+
+/* At 840px the tabs, Pin/Prev/Next and the player menu do not fit on one row:
+   the menu overflowed by 25px and .app's overflow:hidden silently clipped its
+   chevron rather than scrolling. Let the footer wrap instead. */
+[data-bucket="m"] .footer{
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 8px;
+}
+
+[data-bucket="m"] .playerMenuBtn{
+  min-width: 0;
+}
+
+[data-bucket="m"] .playerMenuValue{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Chrome off ------------------------------------------------ */
+
+[data-chrome="off"] .footer{
+  display: none;
+}
+
+/* ---------- Bucket: tall (phones, portrait) --------------------------- */
+
+html[data-bucket="tall"],
+html[data-bucket="tall"] body{
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+}
+
+html[data-bucket="tall"] #app{
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+[data-bucket="tall"] .grid{
+  grid-template-columns: 1fr;
+  grid-template-rows: none;
+  overflow: visible;
+}
+
+[data-bucket="tall"] .card.full{
+  grid-column: 1;
+}
+
+[data-bucket="tall"] .footer{
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+[data-bucket="tall"] .tabs,
+[data-bucket="tall"] .controls{
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+[data-bucket="tall"] .playerMenuBtn{ min-width: 0; width: 100%; }
+[data-bucket="tall"] .headerActions{ position: static; transform: none; }
+[data-bucket="tall"] .header{ flex-direction: column; gap: 10px; }
+
+[data-bucket="tall"] .mainFill{ min-height: 70vh; }
+[data-bucket="tall"] .totalGrid{ grid-template-columns: repeat(2, 1fr); }
+
+/* Stacked rows are auto-height, so the gauge cards need a definite height of
+   their own for .gaugeSvg to flex into. Without this the arcs render at 0. */
+[data-bucket="tall"] .cardArc{
+  min-height: 300px;
+}
+
+[data-bucket="tall"] .cardMilestones{
+  min-height: 110px;
+}
+
+/* ---------- Item views: give the gauges the spare room ---------------- */
+
+[data-bucket="xl"] .gaugeTextMain{ font-size: 24px; }
+
+[data-bucket="l"] .cardMilestones,
+[data-bucket="xl"] .cardMilestones{
+  padding-block: 12px;
+}
+
+/* ---------- GIM panels: fill the height they are given --------------- */
+
+/* The skill grid used to be content-height, leaving the lower two thirds of
+   each panel empty - the opposite of what a read-at-a-distance panel wants. */
+.gimSkillsGrid{
+  flex: 1 1 auto;
+  grid-auto-rows: minmax(0, 1fr);
+  align-content: stretch;
+}
+
+/* Column count follows how wide each panel actually is, so cells stay roughly
+   square instead of tall and skinny. The DOM order is flat (gathering, then
+   support, then combat), so re-flowing keeps each group contiguous.
+     xl - 5 panels across, ~490px each -> 4 columns x 6 rows
+     l  - 3-over-2, ~543px but only ~190px tall -> 8 columns x 3 rows
+     m  - one panel filling the slot -> 6 columns x 4 rows */
+[data-bucket="xl"] .gimSkillsGrid{
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+[data-bucket="l"] .gimSkillsGrid{
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+[data-bucket="m"] .gimLayoutSingle .gimSkillsGrid,
+.gimLayoutSingle .gimSkillsGrid{
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+[data-bucket="tall"] .gimSkillsGrid{
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.gimSkillCell{
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 7px;
+}
+
+[data-bucket="xl"] .gimSkillIcon,
+[data-bucket="l"] .gimSkillIcon{ width: 22px; height: 22px; }
+
+[data-bucket="xl"] .gimSkillLvl,
+[data-bucket="l"] .gimSkillLvl{ font-size: 15px; }
+
+[data-bucket="xl"] .gimSkillBarTrack,
+[data-bucket="l"] .gimSkillBarTrack{ height: 6px; }
+
+[data-bucket="xl"] .gimPanelName,
+[data-bucket="l"] .gimPanelName{ font-size: 16px; }
+
+[data-bucket="xl"] .gimTotals,
+[data-bucket="l"] .gimTotals{ font-size: 13px; }
+
+/* The single cycling panel has a whole slot to itself, so it can breathe. */
+.gimLayoutSingle .gimSkillIcon{ width: 24px; height: 24px; }
+.gimLayoutSingle .gimSkillLvl{ font-size: 16px; }
+.gimLayoutSingle .gimPanelName{ font-size: 17px; }
+
+/* ---------- GIM: panel grids per bucket ------------------------------- */
+
+.gimLayoutGrid{
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+}
+
+/* XL (2536x696): all five members in one row, ~490px each. */
+[data-bucket="xl"] .gimLayoutGrid{
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* L (1688x696): three over two. The die-5 pattern this replaces left the two
+   opposite corners of the slot empty. */
+[data-bucket="l"] .gimLayoutGrid{
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+[data-bucket="l"] .gimLayoutGrid > .gimSlot:nth-child(1){ grid-area: 1 / 1 / 2 / 3; }
+[data-bucket="l"] .gimLayoutGrid > .gimSlot:nth-child(2){ grid-area: 1 / 3 / 2 / 5; }
+[data-bucket="l"] .gimLayoutGrid > .gimSlot:nth-child(3){ grid-area: 1 / 5 / 2 / 7; }
+[data-bucket="l"] .gimLayoutGrid > .gimSlot:nth-child(4){ grid-area: 2 / 2 / 3 / 4; }
+[data-bucket="l"] .gimLayoutGrid > .gimSlot:nth-child(5){ grid-area: 2 / 4 / 3 / 6; }
+
+/* M and anything else that reaches the grid layout: two columns, scrolling. */
+[data-bucket="m"] .gimLayoutGrid{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(150px, auto);
+  overflow: auto;
+}
+
+[data-bucket="tall"] .gimLayoutGrid{
+  grid-template-columns: 1fr;
+  grid-auto-rows: minmax(190px, auto);
+  height: auto;
+  overflow: visible;
+}
+
+/* Single cycling panel (default for the M slot). */
+.gimLayoutSingle{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.gimLayoutSingle > .gimSlot{
+  flex: 1;
+  min-height: 0;
+}
+
+.gimDots{
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+.gimDot{
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.22);
+}
+
+.gimDotActive{ background: var(--accent); }
+
+/* ---------- GIM: compact summary (?gim=summary) ----------------------- */
+
+.gimSummary{
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  overflow: auto;
+}
+
+.gimSummaryRow{
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 3fr auto auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  border-radius: var(--radius-tile);
+  padding: 8px 12px;
+}
+
+.gimSummaryName{
+  font-weight: 800;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gimSummaryBar{
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+
+.gimSummaryBarFill{
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+
+.gimSummaryStat{
+  font-weight: 900;
+  font-size: 14px;
+  text-align: right;
+  min-width: 60px;
+}
+
+.gimSummaryXp{
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 96px;
+}
+
+/* ---------- Team view per bucket -------------------------------------- */
+
+/* Side by side only where there is horizontal room; the view itself omits the
+   second panel at narrower buckets, so these just set the proportions. */
+/* Wide buckets put the side panel beside the standings. Narrow ones stack it
+   underneath and scroll, rather than dropping it - it used never to appear at
+   all in a browser window, which is where most of the group sees this page. */
+[data-bucket="xl"] .teamWrap{
+  grid-template-columns: 1.3fr 1fr;
+  gap: 18px;
+}
+
+[data-bucket="l"] .teamWrap{
+  grid-template-columns: 1.1fr 1fr;
+}
+
+/* Two columns of side rows fit across the full panel. */
+[data-bucket="xl"] .sideList{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+}
+
+[data-bucket="xl"] .teamName,
+[data-bucket="xl"] .teamCell{ font-size: 16px; }
+[data-bucket="xl"] .teamRank{ font-size: 15px; }
+
+/* Stacked: the standings take their natural height and the side panel gets
+   whatever is left, scrolling inside itself. */
+[data-bucket="m"] .teamWrap,
+[data-bucket="tall"] .teamWrap{
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  overflow: auto;
+}
+
+[data-bucket="m"] .teamTable,
+[data-bucket="tall"] .teamTable{
+  flex: 0 0 auto;
+}
+
+/* The explanatory note is the first thing to go when stacking. */
+[data-bucket="m"] .teamNote,
+[data-bucket="tall"] .teamNote{ display: none; }
+
+/* At M and on phones the 7-day column is dropped first: the current totals
+   matter more than a second delta when space is tight.
+
+   SIX columns, not five. Once the seventh child is hidden there are still six
+   visible (rank, name, bar, primary, secondary, today), and a short column
+   count made the grid wrap them onto extra implicit rows inside every card. */
+[data-bucket="m"] .teamRow,
+[data-bucket="tall"] .teamRow{
+  flex: 0 0 auto;
+  max-height: none;
+  grid-template-columns:
+    30px minmax(60px, 1.2fr) minmax(32px, 1.6fr) auto auto auto;
+  gap: 8px;
+  padding: 6px 10px;
+}
+
+[data-bucket="m"] .teamRow > :nth-child(7),
+[data-bucket="tall"] .teamRow > :nth-child(7){
+  display: none;
+}
+
+/* Tighter rows leave the stacked side panel a usable slice of the card
+   instead of collapsing it to a single line. */
+[data-bucket="m"] .teamName,
+[data-bucket="m"] .teamCell{ font-size: 13px; }
+[data-bucket="m"] .teamTable{ gap: 4px; }
+[data-bucket="m"] .teamPanelTitle{ font-size: 11px; }
+
+[data-bucket="m"] .teamPanelSide,
+[data-bucket="tall"] .teamPanelSide{
+  min-height: 160px;
+}
+
+/* On a phone, six columns squeezed names down to "IronB...". The bar is the
+   only decorative column - the exact numbers sit right beside it - so it is
+   what goes, giving the name real room. */
+[data-bucket="tall"] .teamRow{
+  grid-template-columns: 28px minmax(0, 1fr) auto auto auto;
+}
+
+[data-bucket="tall"] .teamBar{
+  display: none;
+}
+
+[data-bucket="tall"] .teamWrap{ overflow: visible; }
+[data-bucket="tall"] .teamTable{ overflow: visible; }

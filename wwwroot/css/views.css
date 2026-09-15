@@ -1,0 +1,492 @@
+/* ==========================================================
+   View-specific layout: milestones, Total grid, GIM panels.
+   ========================================================== */
+
+/* --- Milestone bar --------------------------------------------------- */
+
+.milestones{
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.milestoneTitle{
+  width: 100%;
+  text-align: center;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.milestoneRow{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.bubble{
+  z-index: 1;
+  height: 44px;
+  width: 44px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.22);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  font-weight: 700;
+  user-select: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease,
+              background 140ms ease, color 140ms ease;
+}
+
+.bubble.dim{ color: var(--dim); }
+
+.bubble.bright{
+  color: var(--text);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  box-shadow: var(--accent-glow), var(--shadow);
+}
+
+.segWrap{
+  display: flex;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.segTrack{
+  flex: 1 1 auto;
+  height: 12px;
+  min-width: 48px;
+  margin-inline: -6px;
+  border-top: 1px solid rgba(255,255,255,0.24);
+  border-bottom: 1px solid rgba(255,255,255,0.24);
+  background: rgba(255,255,255,0.06);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.segFill{
+  height: 100%;
+  background: var(--accent);
+  border-top: 4px solid rgba(0,0,0,0.45);
+  border-bottom: 4px solid rgba(0,0,0,0.45);
+}
+
+/* --- Total view ------------------------------------------------------ */
+
+.totalGridWrap{
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.totalGrid{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.skillTile{
+  /* This was `border: var(--surface-border)` - a colour passed to the border
+     shorthand, which is invalid, so these tiles had no border at all. */
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  border-radius: var(--radius-tile);
+  box-shadow: var(--shadow);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 74px;
+}
+
+.skillTileTop{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.skillTileIcon{ width: 28px; height: 28px; display: block; }
+
+.skillTileName{
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skillTileLevel{ font-size: 18px; font-weight: 900; }
+
+.skillTileBar{
+  height: 6px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.10);
+  margin-top: 8px;
+}
+
+.skillTileBarFill{
+  height: 100%;
+  width: 0%;
+  border-radius: var(--radius-pill);
+}
+
+.totalFooter{
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.10);
+}
+
+.totalFooterStat{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.totalFooterLabel{
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.totalFooterValue{ font-size: 16px; font-weight: 900; }
+
+/* --- GIM view -------------------------------------------------------- */
+
+.gimLayout{
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Panel placement lives in layout.css, which varies it by bucket. */
+.gimSlot{
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.gimPanel{
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: rgba(0,0,0,0.90);
+  box-shadow: var(--shadow);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gimPanelHeader{
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.gimPanelName{
+  grid-column: 2;
+  justify-self: center;
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.gimPanelTag{
+  grid-column: 3;
+  justify-self: end;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.gimLoading,
+.gimPanelError{
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.gimPanelError{ font-size: 12px; color: var(--dim); }
+
+.gimSkillsGrid{
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.gimSkillCell{
+  /* Same invalid-border bug as .skillTile. */
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  border-radius: 5px;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gimSkillTop{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.gimSkillIcon{ width: 18px; height: 18px; }
+
+.gimSkillLvl{
+  font-weight: 900;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.gimSkillBarTrack{
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+
+.gimSkillBarFill{
+  height: 100%;
+  border-radius: var(--radius-pill);
+}
+
+.gimTotals{
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.gimTotals span{ color: var(--text); font-weight: 900; }
+
+/* --- Team view ------------------------------------------------------- */
+
+.cardTeam{
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.teamWrap{
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.teamPanel{
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teamPanelTitle{
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.teamTable{
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+
+.teamRow{
+  flex: 1 1 auto;
+  min-height: 44px;
+  max-height: 76px;
+  display: grid;
+  grid-template-columns: 40px minmax(80px, 1.4fr) minmax(60px, 3fr)
+                         minmax(56px, auto) minmax(56px, auto)
+                         minmax(64px, auto) minmax(64px, auto);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  border-radius: var(--radius-tile);
+  padding: 8px 12px;
+}
+
+.teamRowHead{
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+  border-color: transparent;
+  background: transparent;
+  padding-block: 0;
+  font-size: 11px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.teamRowHead .teamCell,
+.teamRowHead .teamName{ font-weight: 700; font-size: 11px; }
+.teamBarHead{ border: 0; background: transparent; height: auto; }
+
+.teamRank{
+  font-weight: 900;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.teamName{
+  font-weight: 800;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teamBar{
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+
+.teamBarFill{
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+
+.teamCell{
+  font-weight: 900;
+  font-size: 14px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.teamXp{ font-weight: 700; color: var(--muted); }
+.teamGain{ font-weight: 800; font-size: 13px; }
+.teamGainPositive{ color: #6ee7a0; }
+.teamGainEmpty{ color: var(--dim); font-weight: 700; }
+
+.teamNote{
+  font-size: 11px;
+  color: var(--dim);
+  line-height: 1.5;
+}
+
+.teamEmpty{
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  font-weight: 700;
+}
+
+/* --- Team side panel (about-to-level / most-killed / most-completed) --- */
+
+.sideList{
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  overflow: auto;
+  align-content: start;
+}
+
+.sideRow{
+  display: grid;
+  grid-template-columns: 22px minmax(96px, 1.3fr) minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.sideIcon{ width: 20px; height: 20px; }
+
+.sideLabel{ min-width: 0; }
+
+.sideMain{
+  font-weight: 800;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sideSub{
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sideBar{
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.10);
+  overflow: hidden;
+}
+
+.sideBarFill{ height: 100%; border-radius: var(--radius-pill); }
+
+.sideValue{
+  font-weight: 800;
+  font-size: 12px;
+  text-align: right;
+  color: var(--muted);
+  min-width: 44px;
+}

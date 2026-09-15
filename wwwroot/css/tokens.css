@@ -1,0 +1,26 @@
+:root{
+  /* Device + widget palette */
+  --bg: #000000;
+  --card: #000000;
+  --border: rgba(255,255,255,0.18);
+  --text: #ffffff;
+  --muted: rgba(255,255,255,0.75);
+  --dim: rgba(255,255,255,0.55);
+
+  /* Accent is defined once as channels so every tint derives from it.
+     It used to be retyped as a literal rgba(239,80,231,...) in six places,
+     which made retheming a six-edit job. */
+  --accent-rgb: 239 80 231;
+  --accent: rgb(var(--accent-rgb));
+  --accent-soft: rgb(var(--accent-rgb) / 0.12);
+  --accent-line: rgb(var(--accent-rgb) / 0.85);
+  --accent-glow: 0 0 0 2px rgb(var(--accent-rgb) / 0.15);
+
+  --shadow: 0 10px 25px rgba(0,0,0,0.55);
+  --surface: rgba(255,255,255,0.10);
+  --surface-border: rgba(255,255,255,0.22);
+
+  --radius-card: 16px;
+  --radius-tile: 12px;
+  --radius-pill: 999px;
+}
