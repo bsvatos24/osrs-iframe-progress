@@ -231,6 +231,85 @@ entries have no icon file committed.
 
 ### Where the icons come from
 
+All 112 hiscore icons are lossless PNGs imported from
+[Wise Old Man](https://github.com/wise-old-man/wise-old-man)'s
+`app/public/img/metrics/`, via `tools/import-icons.mjs`:
+
+```sh
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/wise-old-man/wise-old-man /tmp/wom
+git -C /tmp/wom sparse-checkout set app/public/img/metrics
+node tools/import-icons.mjs /tmp/wom
+```
+
+WOM names its files after its own metric ids, which match the hiscore display
+names once punctuation is stripped — except five, which the tool aliases
+(`Runecraft`→`runecrafting`, `LMS - Rank`→`last_man_standing`,
+`PvP Arena - Rank`→`pvp_arena`, `Rifts closed`→`guardians_of_the_rift`,
+`Tombs of Amascut: Expert Mode`→`tombs_of_amascut_expert`).
+
+**RuneLite is not a usable source for boss art.** Its hiscore panel calls
+`spriteManager.getSpriteAsync(skill.getSpriteId(), …)` and reads each icon out
+of the running game client's sprite cache by numeric id, so the repository ships
+no boss images at all — only the 24 skill icons and some account-type badges.
+For the 25 icons both projects carry, 23 are pixel-identical and the other two
+differ by at most 11/255, so WOM is used throughout for a single provenance.
+
+The sprite ids in `hiscore-data.js` remain a lookup for anyone extracting art
+from a game cache directly.
+
+**The sprites are cropped to their content, not padded** — they range from
+16×20 to 29×27. Every icon rule fixes both width and height for layout, so they
+all carry `object-fit: contain`; without it Thieving (25×13) skews 48% in a
+28×28 box.
+
+### Adding a team member
+
+Edit `TEAM` in `wwwroot/js/constants.js`. The player dropdown and the GIM layout
+are both derived from it. `pos` places the member in the GIM view
+(`tl`/`tr`/`bl`/`br`/`c`).
+
+### Icons
+
+Icon filenames are the display name lowercased with `:'()` stripped and spaces
+replaced by hyphens — `Chambers of Xeric: Challenge Mode` becomes
+`chambers-of-xeric-challenge-mode.png`.
+
+The icon set is checked in by hand and Jagex adds bosses every few months, so a
+missing file is expected rather than exceptional. Any name without one renders a
+**monogram badge** instead — `Brutus` becomes `BR`, `Mad Angel` becomes `MA` —
+which keeps the row readable and covers future additions automatically. To
+replace a monogram with real art, drop a PNG at the slugged filename (about
+32×32, transparent) and it is picked up with no code change:
+
+```
+wwwroot/icons/activities/brutus.png
+wwwroot/icons/activities/mad-angel.png
+```
+
+### Hiscore classification is generated, not hand-kept
+
+The hiscores return one flat `activities` array mixing bosses with minigames,
+clue scrolls and points tables, and nothing in the payload says which is which.
+That split used to be a hand-maintained list here, which meant every newly
+released boss quietly appeared under Activities until somebody noticed — Brutus,
+Mad Angel and Maggot King all did.
+
+It now comes from [RuneLite](https://github.com/runelite/runelite)'s
+`HiscoreSkill.java`, which keeps an authoritative typed list. To refresh after a
+game update:
+
+```sh
+git clone --depth 1 https://github.com/runelite/runelite /tmp/runelite
+node tools/sync-hiscore-data.mjs /tmp/runelite
+```
+
+That rewrites `wwwroot/js/hiscore-data.js` (generated — do not edit by hand)
+with the skill, activity and boss lists, each entry's game sprite id, and which
+entries have no icon file committed.
+
+### Where the icons come from
+
 The **skill** icons come from
 [RuneLite's `skill_icons/`](https://github.com/runelite/runelite/tree/master/runelite-client/src/main/resources/skill_icons),
 as lossless 25×25 PNGs.

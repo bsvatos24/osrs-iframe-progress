@@ -248,7 +248,5 @@ export const SPRITE_IDS = {
 // monogram for these rather than requesting a file that does not exist.
 // Drop a PNG at the slugged name and re-run the sync to clear it from here.
 export const ICONLESS = [
-  "Brutus",
-  "Mad Angel",
-  "Maggot King"
+
 ];

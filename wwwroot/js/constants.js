@@ -70,6 +70,14 @@ export const GIM_SKILL_ORDER = [
   ["Attack", "Strength", "Defence", "Ranged", "Prayer", "Magic", "Runecraft", "Construction"]
 ];
 
+// Singular labels for the picker dialog. Trimming the plural by hand gave
+// "Pick a Bosse" and would have given "Pick a Activitie".
+export const CATEGORY_SINGULAR = {
+  skills: "skill",
+  bosses: "boss",
+  activities: "activity"
+};
+
 export const CATEGORIES = [
   { id: "skills", label: "Skills" },
   { id: "bosses", label: "Bosses" },

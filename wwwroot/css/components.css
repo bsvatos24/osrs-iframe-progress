@@ -425,6 +425,19 @@
   outline: 1px solid var(--border);
 }
 
+/* The game sprites are cropped to their content, not padded to a square, so
+   they range from 16x20 to 29x27. Every icon rule below fixes both width and
+   height for layout, which would stretch them - Thieving (25x13) was being
+   skewed 48% into a 28x28 box. `contain` letterboxes instead. */
+.icon,
+.skillTileIcon,
+.gimSkillIcon,
+.pickerIcon,
+.sideIcon,
+.upcomingIcon{
+  object-fit: contain;
+}
+
 /* Monogram stand-in for an icon file that does not exist yet. Inherits the
    sizing of whatever image class it replaced. */
 .iconFallback{

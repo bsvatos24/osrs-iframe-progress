@@ -9,8 +9,8 @@
 import { loadPlayer, loadPlayers } from "./api.js";
 import { applyConfigToDocument, config } from "./config.js";
 import {
-  CATEGORIES, GIM_POSITIONS, ITEM_CATEGORIES, SKILL_GRID_ORDER, TEAM_CATEGORIES,
-  TEAM_METRICS
+  CATEGORIES, CATEGORY_SINGULAR, GIM_POSITIONS, ITEM_CATEGORIES, SKILL_GRID_ORDER,
+  TEAM_CATEGORIES, TEAM_METRICS
 } from "./constants.js";
 import { gridIcon, iconButton, refreshIcon } from "./components.js";
 import { button, el, img, replaceChildren } from "./dom.js";
@@ -618,8 +618,8 @@ function paintPicker() {
     return;
   }
 
-  const label = state.category.charAt(0).toUpperCase() + state.category.slice(1, -1);
-  p.title.textContent = "Pick a " + label;
+  const word = CATEGORY_SINGULAR[state.category] || "item";
+  p.title.textContent = "Pick a " + word.charAt(0).toUpperCase() + word.slice(1);
   paintPickerGrid(p.grid, p.input.value);
 
   if (!p.dialog.open) {
