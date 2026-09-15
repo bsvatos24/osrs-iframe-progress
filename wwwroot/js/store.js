@@ -27,6 +27,9 @@ export const state = {
   fetchedAt: null,
   stale: false,
 
+  // Which metric the Team view ranks by: skills, bosses or activities.
+  teamMetric: "skills",
+
   // GIM results live here, not in the DOM. Any render used to replace the GIM
   // panels with a placeholder that nothing resolved.
   gim: { results: [], loading: false, loaded: false, cycleIndex: 0 }

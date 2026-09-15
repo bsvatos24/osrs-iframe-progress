@@ -11,14 +11,34 @@ export function el(tag, className, text) {
   return node;
 }
 
+// Up to two letters standing in for a missing icon: "Mad Angel" -> MA,
+// "Brutus" -> BR.
+export function initials(name) {
+  const words = String(name || "").trim().split(/[\s:'-]+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
 export function img(src, alt, className) {
   const node = document.createElement("img");
   node.className = className || "";
   node.src = src;
   node.alt = alt || "";
-  // Jagex adds bosses every few months; without this a name with no icon file
-  // yet renders as a broken-image glyph.
-  node.addEventListener("error", function () { node.classList.add("iconMissing"); }, { once: true });
+
+  // Jagex adds bosses every few months, and the icon set is checked in by
+  // hand, so a name with no file yet is expected rather than exceptional.
+  // Swap in a monogram badge that keeps the same class - and therefore the
+  // same size - as the image it replaces.
+  node.addEventListener("error", function () {
+    const badge = document.createElement("span");
+    badge.className = (className || "") + " iconFallback";
+    badge.textContent = initials(alt);
+    badge.title = alt || "";
+    badge.setAttribute("aria-label", alt || "");
+    if (node.parentNode) node.replaceWith(badge);
+  }, { once: true });
+
   return node;
 }
 

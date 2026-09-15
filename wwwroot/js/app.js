@@ -9,7 +9,8 @@
 import { loadPlayer, loadPlayers } from "./api.js";
 import { applyConfigToDocument, config } from "./config.js";
 import {
-  CATEGORIES, GIM_POSITIONS, ITEM_CATEGORIES, SKILL_GRID_ORDER, TEAM_CATEGORIES
+  CATEGORIES, GIM_POSITIONS, ITEM_CATEGORIES, SKILL_GRID_ORDER, TEAM_CATEGORIES,
+  TEAM_METRICS
 } from "./constants.js";
 import { gridIcon, iconButton, refreshIcon } from "./components.js";
 import { button, el, img, replaceChildren } from "./dom.js";
@@ -166,7 +167,14 @@ function preserveSelection() {
 
   if (desiredId) {
     const idx = filtered.findIndex(function (x) { return x.id === desiredId; });
-    state.index = idx >= 0 ? idx : 0;
+    if (idx >= 0) {
+      state.index = idx;
+      return;
+    }
+    // The pinned entry does not exist for this player (an unranked skill, or a
+    // boss they have never killed). Keep the pin so it reappears when they
+    // switch back, but land on something real in the meantime.
+    state.index = 0;
     return;
   }
   state.index = filtered.length > 0 ? Math.min(state.index, filtered.length - 1) : 0;
@@ -346,17 +354,36 @@ function onNext() {
 
 function onTogglePin() {
   const wasPinned = state.pinned || state.pinnedId;
-  state.pinned = !wasPinned;
-  state.pinnedId = null;
+
+  if (wasPinned) {
+    state.pinned = false;
+    state.pinnedId = null;
+  } else {
+    // Record WHICH item is pinned, not just that cycling is paused. Without
+    // the id, switching player had nothing to restore and fell back to the
+    // first entry in the category.
+    const current = getCurrent();
+    state.pinned = true;
+    state.pinnedId = current ? current.id : null;
+  }
+
   invalidate("footer");
   startCycleTimer();
+}
+
+function onMetricChange(metric) {
+  if (state.teamMetric === metric) return;
+  state.teamMetric = metric;
+  invalidate("header", "main", "footer");
 }
 
 function onPlayerChange(name) {
   if (name === state.player) return;
   state.player = name;
-  state.index = 0;
-  state.lastSelectedId = null;
+  // Deliberately keep pinnedId AND lastSelectedId: skill and activity ids are
+  // stable across players, so switching to a teammate should land on the same
+  // skill rather than resetting to the first one. preserveSelection() resolves
+  // the index once the new payload arrives.
   invalidate("footer");
   loadData();
 }
@@ -383,8 +410,12 @@ function buildHeaderCenter(current) {
   const center = el("div", "headerCenter");
 
   if (state.category === "gim" || state.category === "team") {
-    center.appendChild(el("div", "headerGimOnly",
-      state.category === "gim" ? "GIM Levels" : "Team Standings"));
+    let label = "GIM Levels";
+    if (state.category === "team") {
+      const metric = TEAM_METRICS.find(function (m) { return m.id === state.teamMetric; });
+      label = "Team \u00B7 " + (metric ? metric.label : "Skills");
+    }
+    center.appendChild(el("div", "headerGimOnly", label));
     return center;
   }
 
@@ -455,40 +486,43 @@ function buildControls() {
   next.disabled = !isItemView || empty;
   controls.appendChild(next);
 
-  controls.appendChild(buildPlayerMenu());
+  controls.appendChild(state.category === "team" ? buildMetricMenu() : buildPlayerMenu());
   return controls;
 }
 
-function buildPlayerMenu() {
+// A small custom dropdown. Used for the player selector and, on the Team tab,
+// for the metric selector - a single player means nothing on that view.
+function buildDropdown(opts) {
   const wrapper = el("div", "playerMenu");
 
   const btn = button("btn playerMenuBtn", null, function () {
-    const open = wrapper.querySelector(".playerMenuPanel");
-    if (open) return closeMenu();
+    if (wrapper.querySelector(".playerMenuPanel")) return closeMenu();
 
     chevron.classList.add("open");
     btn.setAttribute("aria-expanded", "true");
 
     const panel = el("div", "playerMenuPanel");
     panel.setAttribute("role", "listbox");
-    config.players.forEach(function (name) {
-      const active = name === state.player;
-      const item = button("playerMenuItem" + (active ? " active" : ""), name, function () {
-        onPlayerChange(name);
-      });
+    opts.options.forEach(function (option) {
+      const active = option.value === opts.value;
+      const item = button("playerMenuItem" + (active ? " active" : ""), option.label,
+        function () { opts.onSelect(option.value); });
       item.setAttribute("role", "option");
       item.setAttribute("aria-selected", active ? "true" : "false");
       panel.appendChild(item);
     });
     wrapper.appendChild(panel);
   });
-  btn.disabled = state.loading || state.refreshing;
-  btn.title = "Select player";
+
+  btn.disabled = !!opts.disabled;
+  btn.title = opts.title;
+  btn.setAttribute("aria-label", opts.title);
   btn.setAttribute("aria-haspopup", "listbox");
   btn.setAttribute("aria-expanded", "false");
 
-  btn.appendChild(el("span", "playerMenuValue", state.player));
-  const chevron = el("span", "playerMenuChevron", "▾");
+  const selected = opts.options.find(function (o) { return o.value === opts.value; });
+  btn.appendChild(el("span", "playerMenuValue", selected ? selected.label : opts.value));
+  const chevron = el("span", "playerMenuChevron", "\u25BE");
   btn.appendChild(chevron);
 
   function closeMenu() {
@@ -498,7 +532,6 @@ function buildPlayerMenu() {
     btn.setAttribute("aria-expanded", "false");
   }
 
-  // Close on any pointer press outside the menu.
   document.addEventListener("pointerdown", function (e) {
     if (!wrapper.isConnected) return;
     if (!wrapper.contains(e.target)) closeMenu();
@@ -506,6 +539,25 @@ function buildPlayerMenu() {
 
   wrapper.appendChild(btn);
   return wrapper;
+}
+
+function buildPlayerMenu() {
+  return buildDropdown({
+    title: "Select player",
+    value: state.player,
+    disabled: state.loading || state.refreshing,
+    options: config.players.map(function (name) { return { value: name, label: name }; }),
+    onSelect: onPlayerChange
+  });
+}
+
+function buildMetricMenu() {
+  return buildDropdown({
+    title: "Measure team by",
+    value: state.teamMetric,
+    options: TEAM_METRICS.map(function (m) { return { value: m.id, label: m.label }; }),
+    onSelect: onMetricChange
+  });
 }
 
 // --- Picker ----------------------------------------------------------------
@@ -606,7 +658,11 @@ function paintPickerGrid(container, query) {
       }
     });
 
-    cell.appendChild(img(item.iconUrl, "", "pickerIcon"));
+    const icon = img(item.iconUrl, item.name, "pickerIcon");
+    // The name is rendered as a label right below, so the image itself is
+    // decorative - but the fallback monogram still needs the name.
+    icon.setAttribute("aria-hidden", "true");
+    cell.appendChild(icon);
     cell.appendChild(el("div", "pickerName", item.name));
 
     const pinRow = el("div", "pickerPinRow");

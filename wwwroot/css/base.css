@@ -34,7 +34,13 @@ body{
 .grid{
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto 1fr;
+  /* minmax(0, 1fr) for the gauge row, not auto, and not a bare 1fr:
+     - `auto 1fr` gave the gauge row its content height, and since .gaugeSvg
+       flexes into its parent that resolved to 0 and the arcs vanished.
+     - a bare `1fr` carries an auto minimum that the gauge's aspect ratio
+       fills, squeezing the milestone row to ~20px.
+     The milestone row is `auto` so it hugs its bubbles. */
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 12px;
   flex: 1;
   min-height: 0;

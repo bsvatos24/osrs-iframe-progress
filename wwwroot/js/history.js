@@ -13,7 +13,7 @@
 // for Wise Old Man's server-side history later without touching the views.
 // ============================================================
 
-import { skillTotals } from "./model.js";
+import { activityTotals, skillTotals } from "./model.js";
 
 const KEY_PREFIX = "osrsgim.history.";
 const KEEP_DAYS = 21;
@@ -57,17 +57,32 @@ function prune(days) {
   return days;
 }
 
+// The numbers a snapshot tracks. Adding a key here makes it available to
+// gains() automatically; older stored snapshots simply lack it and report null
+// rather than a bogus zero.
+function metricsOf(hiscores) {
+  const totals = skillTotals(hiscores);
+  const acts = activityTotals(hiscores);
+  return {
+    level: totals.level,
+    xp: totals.xp,
+    kc: acts.bossKc,
+    clues: acts.clues,
+    activity: acts.activityScore
+  };
+}
+
 // Record today's first observation for a player. Safe to call on every poll.
 export function snapshot(player, hiscores) {
   if (!hiscores) return;
-  const totals = skillTotals(hiscores);
-  if (totals.xp <= 0) return; // never anchor a day on a failed/empty read
+  const metrics = metricsOf(hiscores);
+  if (metrics.xp <= 0) return; // never anchor a day on a failed/empty read
 
   const days = read(player);
   const today = dayKey();
   if (days[today]) return; // first observation of the day wins
 
-  days[today] = { level: totals.level, xp: totals.xp };
+  days[today] = metrics;
   write(player, prune(days));
 }
 
@@ -91,12 +106,14 @@ function baseline(days, daysBack) {
   return { key: useKey, entry: days[useKey] };
 }
 
-// Gains for a player against their own stored history.
-// `days: 0` compares against this morning's first observation.
+// Gains for a player against their own stored history, for every tracked
+// metric. `daysBack: 0` compares against this morning's first observation.
+// A metric missing from the stored snapshot comes back null, so the UI can say
+// "no baseline" instead of claiming zero progress.
 export function gains(player, hiscores, daysBack) {
   if (!hiscores) return null;
   const stored = read(player);
-  const current = skillTotals(hiscores);
+  const current = metricsOf(hiscores);
 
   const from = daysBack === 0
     ? (stored[dayKey()] ? { key: dayKey(), entry: stored[dayKey()] } : null)
@@ -104,12 +121,12 @@ export function gains(player, hiscores, daysBack) {
 
   if (!from) return null;
 
-  return {
-    since: from.key,
-    level: Math.max(0, current.level - from.entry.level),
-    xp: Math.max(0, current.xp - from.entry.xp),
-    exact: daysBack === 0 || from.key === dayKey(new Date(Date.now() - daysBack * 86400000))
-  };
+  const deltas = { since: from.key };
+  Object.keys(current).forEach(function (key) {
+    const was = from.entry[key];
+    deltas[key] = typeof was === "number" ? Math.max(0, current[key] - was) : null;
+  });
+  return deltas;
 }
 
 // How many distinct days of history exist for a player.

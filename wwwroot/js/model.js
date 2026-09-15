@@ -6,7 +6,7 @@
 // and milestone metadata.
 // ============================================================
 
-import { BOSS_NAMES } from "./constants.js";
+import { BOSS_NAMES, NON_COUNT_ACTIVITIES } from "./constants.js";
 import {
   clamp, levelProgress, nextMilestone, prevMilestone, xpForLevel,
   MAX_SKILL_LEVEL, MAX_SKILL_XP, SKILL_MILESTONES, KC_MILESTONES
@@ -137,4 +137,57 @@ export function skillTotals(data) {
     acc.xp += rankedValue(s.xp);
     return acc;
   }, { level: 0, xp: 0 });
+}
+
+// Boss and activity aggregates for a raw hiscores payload. Used by the Team
+// view, which needs them for every member, and by the history snapshots.
+export function activityTotals(data) {
+  const rows = (data && data.activities) || [];
+
+  let bossKc = 0;
+  let uniqueBosses = 0;
+  let activityScore = 0;
+  let clues = 0;
+  let collections = 0;
+
+  for (const row of rows) {
+    const score = rankedValue(row.score);
+    const isBoss = BOSS_NAMES.has(row.name);
+
+    if (isBoss) {
+      bossKc += score;
+      if (score > 0) uniqueBosses += 1;
+      continue;
+    }
+
+    if (row.name === "Clue Scrolls (all)") clues = score;
+    if (row.name === "Collections Logged") collections = score;
+
+    // Ranks and points balances are not counts; adding them to a total would
+    // produce a number that means nothing.
+    if (!NON_COUNT_ACTIVITIES.has(row.name)) activityScore += score;
+  }
+
+  return {
+    bossKc: bossKc,
+    uniqueBosses: uniqueBosses,
+    activityScore: activityScore,
+    clues: clues,
+    collections: collections
+  };
+}
+
+// Flat per-entry list for the Team view's ranked side panels.
+export function activityEntries(data, kind) {
+  const rows = (data && data.activities) || [];
+  return rows
+    .filter(function (row) {
+      const isBoss = BOSS_NAMES.has(row.name);
+      if (kind === "bosses") return isBoss;
+      return !isBoss && !NON_COUNT_ACTIVITIES.has(row.name);
+    })
+    .map(function (row) {
+      return { name: row.name, score: rankedValue(row.score), isBoss: BOSS_NAMES.has(row.name) };
+    })
+    .filter(function (row) { return row.score > 0; });
 }

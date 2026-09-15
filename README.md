@@ -16,12 +16,15 @@ consumers from one deploy:
 | Activities | Same as Bosses, for minigames, clue scrolls and points tables |
 | Total | All 24 skills with level and intra-level progress, plus total level and XP |
 | GIM | Every team member's skills side by side with their totals |
-| Team | Standings ranked by total level, with XP gained today and over 7 days, plus an "about to level" board of the level-ups nearest across the whole team |
+| Team | Everyone ranked by a metric you choose from the footer dropdown - **Skills** (total level, XP, gains, plus an "about to level" board), **Bosses** (total KC, unique bosses, plus the team's most-killed) or **Activities** (clues, collections, plus most-completed) |
 
 In kiosk mode the current category auto-cycles every 6 seconds; **Pin** freezes
 it, the grid button opens a searchable picker, and the player dropdown switches
-accounts. In web mode cycling is off by default so the view does not move while
-you are reading it.
+accounts. Pinning remembers *which* entry is pinned, so switching to a teammate
+lands on the same skill or boss rather than resetting to the first one. In web
+mode cycling is off by default so the view does not move while you are reading
+it. On the Team tab the player dropdown becomes the metric dropdown, since a
+single player means nothing on that view.
 
 ## Running locally
 
@@ -127,9 +130,12 @@ gained. The app stores one snapshot per player per day in `localStorage` and
 diffs against it, which is what powers the Team view's "today" and "7 days"
 columns.
 
-The **first** observation of each day is kept and never overwritten - that is
-what makes "gained today" mean anything; overwriting on each poll would leave
-the delta permanently at zero. Only fresh reads anchor a day, so a cached
+Snapshots track total level, total XP, boss kill count and clue scrolls, so the
+gain columns follow whichever metric the Team view is showing. The **first**
+observation of each day is kept and never overwritten - that is what makes
+"gained today" mean anything; overwriting on each poll would leave the delta
+permanently at zero. A metric absent from an older snapshot reads `new` rather
+than a misleading zero. Only fresh reads anchor a day, so a cached
 payload cannot backdate one. History is per-browser, so it starts from the day
 that browser first opened the page and a teammate's phone has its own.
 
@@ -185,5 +191,23 @@ are both derived from it. `pos` places the member in the GIM view
 
 Icon filenames are the display name lowercased with `:'()` stripped and spaces
 replaced by hyphens — `Chambers of Xeric: Challenge Mode` becomes
-`chambers-of-xeric-challenge-mode.png`. A name with no icon file yet renders
-with the image hidden rather than as a broken-image glyph.
+`chambers-of-xeric-challenge-mode.png`.
+
+The icon set is checked in by hand and Jagex adds bosses every few months, so a
+missing file is expected rather than exceptional. Any name without one renders a
+**monogram badge** instead — `Brutus` becomes `BR`, `Mad Angel` becomes `MA` —
+which keeps the row readable and covers future additions automatically. To
+replace a monogram with real art, drop a PNG at the slugged filename (about
+32×32, transparent) and it is picked up with no code change:
+
+```
+wwwroot/icons/activities/brutus.png
+wwwroot/icons/activities/mad-angel.png
+```
+
+### Adding a boss
+
+The hiscores return one flat `activities` array mixing bosses with minigames, so
+`BOSS_NAMES` in `wwwroot/js/constants.js` is what decides which tab an entry
+lands on. A new boss missing from that set shows up under Activities until it is
+added.

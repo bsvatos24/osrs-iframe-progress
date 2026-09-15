@@ -117,18 +117,17 @@ html[data-bucket="tall"] #app{
 [data-bucket="tall"] .mainFill{ min-height: 70vh; }
 [data-bucket="tall"] .totalGrid{ grid-template-columns: repeat(2, 1fr); }
 
-/* ---------- Item views: give the gauges the spare room ---------------- */
-
-/* Was `auto 1fr`, which handed all slack to the milestone row and left the
-   gauges small in a mostly-empty card.
-
-   `minmax(0, 1fr)`, not `1fr`: a bare 1fr carries an auto minimum, and the
-   gauge's aspect-ratio makes that minimum tall enough to squeeze the
-   milestone row down to 22px. */
-[data-bucket="l"] .grid,
-[data-bucket="xl"] .grid{
-  grid-template-rows: minmax(0, 1fr) auto;
+/* Stacked rows are auto-height, so the gauge cards need a definite height of
+   their own for .gaugeSvg to flex into. Without this the arcs render at 0. */
+[data-bucket="tall"] .cardArc{
+  min-height: 300px;
 }
+
+[data-bucket="tall"] .cardMilestones{
+  min-height: 110px;
+}
+
+/* ---------- Item views: give the gauges the spare room ---------------- */
 
 [data-bucket="xl"] .gaugeTextMain{ font-size: 24px; }
 
@@ -331,17 +330,20 @@ html[data-bucket="tall"] #app{
 
 /* Side by side only where there is horizontal room; the view itself omits the
    second panel at narrower buckets, so these just set the proportions. */
+/* Wide buckets put the side panel beside the standings. Narrow ones stack it
+   underneath and scroll, rather than dropping it - it used never to appear at
+   all in a browser window, which is where most of the group sees this page. */
 [data-bucket="xl"] .teamWrap{
-  grid-template-columns: 1.35fr 1fr;
+  grid-template-columns: 1.3fr 1fr;
   gap: 18px;
 }
 
 [data-bucket="l"] .teamWrap{
-  grid-template-columns: 1.15fr 1fr;
+  grid-template-columns: 1.1fr 1fr;
 }
 
-/* Two columns of upcoming level-ups fit across the full panel. */
-[data-bucket="xl"] .upcomingList{
+/* Two columns of side rows fit across the full panel. */
+[data-bucket="xl"] .sideList{
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px 10px;
 }
@@ -350,15 +352,66 @@ html[data-bucket="tall"] #app{
 [data-bucket="xl"] .teamCell{ font-size: 16px; }
 [data-bucket="xl"] .teamRank{ font-size: 15px; }
 
-/* At M and on phones the gains columns are what get dropped first: total
-   level and XP matter more than a delta when space is tight. */
+/* Stacked: the standings take their natural height and the side panel gets
+   whatever is left, scrolling inside itself. */
+[data-bucket="m"] .teamWrap,
+[data-bucket="tall"] .teamWrap{
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  overflow: auto;
+}
+
+[data-bucket="m"] .teamTable,
+[data-bucket="tall"] .teamTable{
+  flex: 0 0 auto;
+}
+
+/* The explanatory note is the first thing to go when stacking. */
+[data-bucket="m"] .teamNote,
+[data-bucket="tall"] .teamNote{ display: none; }
+
+/* At M and on phones the 7-day column is dropped first: the current totals
+   matter more than a second delta when space is tight.
+
+   SIX columns, not five. Once the seventh child is hidden there are still six
+   visible (rank, name, bar, primary, secondary, today), and a short column
+   count made the grid wrap them onto extra implicit rows inside every card. */
 [data-bucket="m"] .teamRow,
 [data-bucket="tall"] .teamRow{
-  grid-template-columns: 34px minmax(70px, 1.3fr) minmax(40px, 2fr) auto auto;
+  flex: 0 0 auto;
+  max-height: none;
+  grid-template-columns:
+    30px minmax(60px, 1.2fr) minmax(32px, 1.6fr) auto auto auto;
+  gap: 8px;
+  padding: 6px 10px;
 }
 
 [data-bucket="m"] .teamRow > :nth-child(7),
 [data-bucket="tall"] .teamRow > :nth-child(7){
+  display: none;
+}
+
+/* Tighter rows leave the stacked side panel a usable slice of the card
+   instead of collapsing it to a single line. */
+[data-bucket="m"] .teamName,
+[data-bucket="m"] .teamCell{ font-size: 13px; }
+[data-bucket="m"] .teamTable{ gap: 4px; }
+[data-bucket="m"] .teamPanelTitle{ font-size: 11px; }
+
+[data-bucket="m"] .teamPanelSide,
+[data-bucket="tall"] .teamPanelSide{
+  min-height: 160px;
+}
+
+/* On a phone, six columns squeezed names down to "IronB...". The bar is the
+   only decorative column - the exact numbers sit right beside it - so it is
+   what goes, giving the name real room. */
+[data-bucket="tall"] .teamRow{
+  grid-template-columns: 28px minmax(0, 1fr) auto auto auto;
+}
+
+[data-bucket="tall"] .teamBar{
   display: none;
 }
 

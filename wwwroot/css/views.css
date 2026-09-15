@@ -431,9 +431,9 @@
   font-weight: 700;
 }
 
-/* --- About to level -------------------------------------------------- */
+/* --- Team side panel (about-to-level / most-killed / most-completed) --- */
 
-.upcomingList{
+.sideList{
   flex: 1;
   min-height: 0;
   display: grid;
@@ -443,9 +443,9 @@
   align-content: start;
 }
 
-.upcomingRow{
+.sideRow{
   display: grid;
-  grid-template-columns: 22px minmax(110px, 1.2fr) minmax(50px, 1fr) 56px;
+  grid-template-columns: 22px minmax(96px, 1.3fr) minmax(40px, 1fr) auto;
   align-items: center;
   gap: 10px;
   border: 1px solid rgba(255,255,255,0.10);
@@ -454,11 +454,11 @@
   padding: 4px 8px;
 }
 
-.upcomingIcon{ width: 20px; height: 20px; }
+.sideIcon{ width: 20px; height: 20px; }
 
-.upcomingLabel{ min-width: 0; }
+.sideLabel{ min-width: 0; }
 
-.upcomingSkill{
+.sideMain{
   font-weight: 800;
   font-size: 12px;
   white-space: nowrap;
@@ -466,7 +466,7 @@
   text-overflow: ellipsis;
 }
 
-.upcomingPlayer{
+.sideSub{
   font-size: 10px;
   color: var(--muted);
   white-space: nowrap;
@@ -474,18 +474,19 @@
   text-overflow: ellipsis;
 }
 
-.upcomingBar{
+.sideBar{
   height: 6px;
   border-radius: var(--radius-pill);
   background: rgba(255,255,255,0.10);
   overflow: hidden;
 }
 
-.upcomingBarFill{ height: 100%; border-radius: var(--radius-pill); }
+.sideBarFill{ height: 100%; border-radius: var(--radius-pill); }
 
-.upcomingRemaining{
+.sideValue{
   font-weight: 800;
   font-size: 12px;
   text-align: right;
   color: var(--muted);
+  min-width: 44px;
 }

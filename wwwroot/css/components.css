@@ -143,6 +143,10 @@
   width: 100%;
   min-height: 0;
   flex: 1 1 0;
+  /* A cap on the main axis only. max-WIDTH would let the square viewBox force
+     a height taller than the card and overflow it; max-height just stops a
+     tall desktop window from rendering a 540px arc. */
+  max-height: 400px;
 }
 
 .gaugeTrack{
@@ -420,3 +424,33 @@
   background: rgba(255,255,255,0.14);
   outline: 1px solid var(--border);
 }
+
+/* Monogram stand-in for an icon file that does not exist yet. Inherits the
+   sizing of whatever image class it replaced. */
+.iconFallback{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.45);
+  background: rgb(var(--accent-rgb) / 0.14);
+  color: var(--text);
+  font-weight: 900;
+  font-size: 9px;
+  letter-spacing: .02em;
+  line-height: 1;
+  overflow: hidden;
+}
+
+/* The header badge is larger and already sits inside a coloured disc. */
+.icon.iconFallback{
+  font-size: 13px;
+  border-radius: var(--radius-pill);
+  border-color: rgba(0,0,0,0.35);
+  background: rgba(0,0,0,0.25);
+}
+
+.pickerIcon.iconFallback{ font-size: 11px; }
+.upcomingIcon.iconFallback,
+.gimSkillIcon.iconFallback{ font-size: 8px; }

@@ -6,13 +6,14 @@
 // with minigames and clue scrolls. Membership here is what splits the two.
 export const BOSS_NAMES = new Set([
   "Abyssal Sire", "Alchemical Hydra", "Amoxliatl", "Araxxor", "Artio",
-  "Barrows Chests", "Bryophyta", "Callisto", "Calvar'ion", "Cerberus",
+  "Barrows Chests", "Brutus", "Bryophyta", "Callisto", "Calvar'ion", "Cerberus",
   "Chambers of Xeric", "Chambers of Xeric: Challenge Mode", "Chaos Elemental",
   "Chaos Fanatic", "Commander Zilyana", "Corporeal Beast", "Crazy Archaeologist",
   "Dagannoth Prime", "Dagannoth Rex", "Dagannoth Supreme", "Deranged Archaeologist",
   "Doom of Mokhaiotl", "Duke Sucellus", "General Graardor", "Giant Mole",
   "Grotesque Guardians", "Hespori", "Kalphite Queen", "King Black Dragon",
-  "Kraken", "Kree'Arra", "K'ril Tsutsaroth", "Lunar Chests", "Mimic", "Nex",
+  "Kraken", "Kree'Arra", "K'ril Tsutsaroth", "Lunar Chests", "Mad Angel",
+  "Mimic", "Nex",
   "Nightmare", "Phosani's Nightmare", "Obor", "Phantom Muspah", "Sarachnis",
   "Scorpia", "Scurrius", "Shellbane Gryphon", "Skotizo", "Sol Heredit",
   "Spindel", "Tempoross", "The Gauntlet", "The Corrupted Gauntlet",
@@ -60,6 +61,15 @@ export const GIM_SKILL_ORDER = [
   ["Attack", "Strength", "Defence", "Ranged", "Prayer", "Magic", "Runecraft", "Construction"]
 ];
 
+// Activity rows whose "score" is a rank or a running points balance rather
+// than a count of anything, so adding them to a total is meaningless.
+export const NON_COUNT_ACTIVITIES = new Set([
+  "League Points", "Deadman Points", "Grid Points", "Colosseum Glory",
+  "LMS - Rank", "PvP Arena - Rank",
+  "Bounty Hunter - Hunter", "Bounty Hunter - Rogue",
+  "Bounty Hunter (Legacy) - Hunter", "Bounty Hunter (Legacy) - Rogue"
+]);
+
 export const CATEGORIES = [
   { id: "skills", label: "Skills" },
   { id: "bosses", label: "Bosses" },
@@ -71,6 +81,13 @@ export const CATEGORIES = [
 
 // Views that need every member's hiscores rather than just the selected one.
 export const TEAM_CATEGORIES = new Set(["gim", "team"]);
+
+// What the Team view can be measured by.
+export const TEAM_METRICS = [
+  { id: "skills", label: "Skills" },
+  { id: "bosses", label: "Bosses" },
+  { id: "activities", label: "Activities" }
+];
 
 // Categories that show a single cycling item rather than an aggregate view.
 export const ITEM_CATEGORIES = new Set(["skills", "bosses", "activities"]);
