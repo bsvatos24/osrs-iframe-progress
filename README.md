@@ -164,7 +164,10 @@ wwwroot/css/
   components.css        cards, gauges, buttons, tabs, picker, player menu
   views.css             milestone bar, Total grid, GIM panels
   layout.css            dual mode: [data-mode] and [data-bucket] rules
+tools/
+  sync-hiscore-data.mjs regenerates hiscore-data.js from a RuneLite checkout
 wwwroot/js/
+  hiscore-data.js       GENERATED: skill/activity/boss lists, sprite ids
   config.js             query-string options
   mode.js               layout bucket resolution (one ResizeObserver)
   constants.js          boss names, team roster, skill orders
@@ -205,9 +208,44 @@ wwwroot/icons/activities/brutus.png
 wwwroot/icons/activities/mad-angel.png
 ```
 
-### Adding a boss
+### Hiscore classification is generated, not hand-kept
 
-The hiscores return one flat `activities` array mixing bosses with minigames, so
-`BOSS_NAMES` in `wwwroot/js/constants.js` is what decides which tab an entry
-lands on. A new boss missing from that set shows up under Activities until it is
-added.
+The hiscores return one flat `activities` array mixing bosses with minigames,
+clue scrolls and points tables, and nothing in the payload says which is which.
+That split used to be a hand-maintained list here, which meant every newly
+released boss quietly appeared under Activities until somebody noticed — Brutus,
+Mad Angel and Maggot King all did.
+
+It now comes from [RuneLite](https://github.com/runelite/runelite)'s
+`HiscoreSkill.java`, which keeps an authoritative typed list. To refresh after a
+game update:
+
+```sh
+git clone --depth 1 https://github.com/runelite/runelite /tmp/runelite
+node tools/sync-hiscore-data.mjs /tmp/runelite
+```
+
+That rewrites `wwwroot/js/hiscore-data.js` (generated — do not edit by hand)
+with the skill, activity and boss lists, each entry's game sprite id, and which
+entries have no icon file committed.
+
+### Where the icons come from
+
+RuneLite is **not** a source for boss art. Its hiscore panel calls
+`spriteManager.getSpriteAsync(skill.getSpriteId(), …)` and reads each icon from
+the running game client's sprite cache by numeric id — the repository contains
+no boss images at all, only account-type badges. Its `skill_icons/` directory
+does hold the 24 skill icons, but they are pixel-identical to the ones already
+committed here.
+
+So the sprite ids in `hiscore-data.js` are the practical lead for sourcing art
+by hand. The three currently without a file:
+
+| Boss | Sprite id |
+|---|---|
+| Brutus | 6352 |
+| Maggot King | 8358 |
+| Mad Angel | 8359 |
+
+Until a file exists, those render as monograms and the app does not request the
+missing path at all.

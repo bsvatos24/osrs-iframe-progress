@@ -21,6 +21,10 @@ export function initials(name) {
 }
 
 export function img(src, alt, className) {
+  // No path at all: the sync tool already knows there is no file, so skip
+  // straight to the monogram instead of requesting nothing.
+  if (!src) return fallbackBadge(alt, className);
+
   const node = document.createElement("img");
   node.className = className || "";
   node.src = src;
@@ -31,15 +35,19 @@ export function img(src, alt, className) {
   // Swap in a monogram badge that keeps the same class - and therefore the
   // same size - as the image it replaces.
   node.addEventListener("error", function () {
-    const badge = document.createElement("span");
-    badge.className = (className || "") + " iconFallback";
-    badge.textContent = initials(alt);
-    badge.title = alt || "";
-    badge.setAttribute("aria-label", alt || "");
-    if (node.parentNode) node.replaceWith(badge);
+    if (node.parentNode) node.replaceWith(fallbackBadge(alt, className));
   }, { once: true });
 
   return node;
+}
+
+function fallbackBadge(alt, className) {
+  const badge = document.createElement("span");
+  badge.className = (className || "") + " iconFallback";
+  badge.textContent = initials(alt);
+  badge.title = alt || "";
+  badge.setAttribute("aria-label", alt || "");
+  return badge;
 }
 
 export function button(className, label, onClick) {

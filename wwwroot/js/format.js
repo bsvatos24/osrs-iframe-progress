@@ -3,6 +3,12 @@
 // ============================================================
 
 import { clamp } from "./osrs.js";
+import { ICONLESS } from "./hiscore-data.js";
+
+// Entries the sync tool found no committed icon for. Returning null instead of
+// a path that 404s means the monogram renders on first paint, with no wasted
+// request on every page load.
+const ICONLESS_SET = new Set(ICONLESS);
 
 // Non-negative, thousands-separated. Guards the many places that render a
 // "remaining" figure which must never read as negative.
@@ -36,10 +42,12 @@ export function slug(name) {
 }
 
 export function iconForSkill(name) {
+  if (ICONLESS_SET.has(name)) return null;
   return "wwwroot/icons/skills/" + slug(name) + ".png";
 }
 
 export function iconForActivity(name) {
+  if (ICONLESS_SET.has(name)) return null;
   return "wwwroot/icons/activities/" + slug(name) + ".png";
 }
 
