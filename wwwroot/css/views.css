@@ -255,29 +255,54 @@
   border: 1px solid var(--surface-border);
   background: var(--surface);
   border-radius: 5px;
-  padding: 3px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  padding: 3px 4px;
+  min-width: 0;
+  min-height: 0;
+  /* The top row takes whatever height is left and the bar always keeps its
+     own. With a flex column and fixed-px contents (48px minimum) the bar was
+     pushed out of the ~40px cells the Edge's L slot gives, and clipped. */
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: center;
+  row-gap: 3px;
+  overflow: hidden;
+  /* The contents size themselves off the cell (cqw/cqh below), not off the
+     bucket: the same bucket gives very different cells depending on the
+     slot's real height, the chrome, and the host's fonts. */
+  container-type: size;
 }
 
 .gimSkillTop{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
 }
 
-.gimSkillIcon{ width: 18px; height: 18px; }
+/* Each size is declared twice: px for engines without container query
+   units, then the cq version, which those engines drop as invalid. */
+.gimSkillIcon{
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  width: clamp(12px, min(55cqh, 37cqw), 34px);
+  height: clamp(12px, min(55cqh, 37cqw), 34px);
+}
 
 .gimSkillLvl{
+  min-width: 0;
   font-weight: 900;
   font-size: 12px;
+  font-size: clamp(10px, min(40cqh, 28cqw), 24px);
   line-height: 1;
+  white-space: nowrap;
 }
 
 .gimSkillBarTrack{
   height: 5px;
+  height: clamp(3px, 10cqh, 7px);
   border-radius: var(--radius-pill);
   background: rgba(255,255,255,0.10);
   overflow: hidden;

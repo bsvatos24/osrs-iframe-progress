@@ -169,20 +169,21 @@ html[data-bucket="tall"] #app{
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.gimSkillCell{
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 7px;
+/* Where the panel has a fixed height the cells scale to fit it, so nothing
+   needs to scroll - a scrollbar on an ambient display is just a grey line. */
+[data-bucket="xl"] .gimSkillsGrid,
+[data-bucket="l"] .gimSkillsGrid,
+.gimLayoutSingle .gimSkillsGrid{
+  overflow: hidden;
+  padding-right: 0;
 }
 
-[data-bucket="xl"] .gimSkillIcon,
-[data-bucket="l"] .gimSkillIcon{ width: 22px; height: 22px; }
-
-[data-bucket="xl"] .gimSkillLvl,
-[data-bucket="l"] .gimSkillLvl{ font-size: 15px; }
-
-[data-bucket="xl"] .gimSkillBarTrack,
-[data-bucket="l"] .gimSkillBarTrack{ height: 6px; }
+/* Where panels are content-height and scroll instead, a size-contained cell
+   contributes no height of its own, so give it one. */
+[data-bucket="m"] .gimLayoutGrid .gimSkillCell,
+[data-bucket="tall"] .gimSkillCell{
+  min-height: 44px;
+}
 
 [data-bucket="xl"] .gimPanelName,
 [data-bucket="l"] .gimPanelName{ font-size: 16px; }
@@ -191,8 +192,6 @@ html[data-bucket="tall"] #app{
 [data-bucket="l"] .gimTotals{ font-size: 13px; }
 
 /* The single cycling panel has a whole slot to itself, so it can breathe. */
-.gimLayoutSingle .gimSkillIcon{ width: 24px; height: 24px; }
-.gimLayoutSingle .gimSkillLvl{ font-size: 16px; }
 .gimLayoutSingle .gimPanelName{ font-size: 17px; }
 
 /* ---------- GIM: panel grids per bucket ------------------------------- */
