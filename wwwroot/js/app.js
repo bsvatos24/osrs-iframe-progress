@@ -446,7 +446,9 @@ function headerTitle(current) {
   if (state.category === "total") return "Totals";
   if (!current) return state.loading ? "Loading…" : "No data";
   if (current.category === "skills") return current.name + " - " + (current.skillLevel || 0);
-  return current.name;
+  // Same "name - value" shape as skills, so the count is readable at a glance
+  // without parsing the gauge.
+  return current.name + " - " + (current.kills || 0).toLocaleString();
 }
 
 // --- Footer ----------------------------------------------------------------

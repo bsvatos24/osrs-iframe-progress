@@ -8,7 +8,7 @@
 
 import { BOSS_NAMES, NON_COUNT_ACTIVITIES } from "./constants.js";
 import {
-  clamp, levelProgress, nextMilestone, prevMilestone, xpForLevel,
+  clamp, levelProgress, nextMilestone, xpForLevel,
   MAX_SKILL_LEVEL, MAX_SKILL_XP, SKILL_MILESTONES, KC_MILESTONES
 } from "./osrs.js";
 import { iconForActivity, iconForSkill } from "./format.js";
@@ -85,9 +85,6 @@ function mapSkill(s) {
 function mapActivity(a) {
   const kills = rankedValue(a.score);
   const next = nextMilestone(kills, KC_MILESTONES);
-  const prev = prevMilestone(kills, KC_MILESTONES);
-  const span = next === null ? 1 : Math.max(1, next - prev);
-  const inSeg = next === null ? 1 : Math.max(0, kills - prev);
 
   return {
     id: "act-" + a.id,
@@ -97,8 +94,14 @@ function mapActivity(a) {
     ranked: isRanked(a.rank),
     rank: rankedValue(a.rank),
     kills: kills,
-    primaryCurrent: inSeg,
-    primaryTarget: span,
+    maxedMilestones: next === null,
+    // The gauge reads "count / next milestone". It used to show kills since
+    // the previous milestone over the width of that step (37 KC read as
+    // "12 / 25"), so the player's actual count appeared nowhere on screen -
+    // and past the last milestone it read "1 / 1". Progress within the step
+    // is still shown by the milestone bar underneath.
+    primaryCurrent: kills,
+    primaryTarget: next === null ? kills : next,
     primaryLabelTop: next === null
       ? kills.toLocaleString() + " KC"
       : "Next Milestone: " + next.toLocaleString(),

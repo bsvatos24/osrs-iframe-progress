@@ -45,8 +45,8 @@ function primaryGauge(item) {
       max: item.primaryTarget,
       labelTop: item.primaryLabelTop,
       centerMainParts: { top: fmt(item.primaryCurrent), bottom: fmt(item.primaryTarget) },
-      centerSub: fmt(remaining) + " Remaining",
-      centerHint: "To next milestone"
+      centerSub: item.maxedMilestones ? "All milestones" : fmt(remaining) + " Remaining",
+      centerHint: item.maxedMilestones ? "Complete" : "To next milestone"
     });
   }
 
