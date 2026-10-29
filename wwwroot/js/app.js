@@ -13,4 +13,13 @@
 
 const mode = document.documentElement.dataset.mode === "kiosk" ? "kiosk" : "web";
 const app = await import(mode === "kiosk" ? "./kiosk.js" : "./web.js");
+
+// index.html inserts this script from JavaScript (so it can carry ?v=), and an
+// inserted module runs as soon as it loads rather than after the page parses.
+// From a warm cache that can be before <div id="app"> exists.
+if (document.readyState === "loading") {
+  await new Promise(function (resolve) {
+    document.addEventListener("DOMContentLoaded", resolve, { once: true });
+  });
+}
 app.start();

@@ -24,6 +24,13 @@ export function isRanked(rank) {
   return typeof rank === "number" && rank > 0;
 }
 
+// Whether the hiscores gave a real level for a skill. Not the same as having a
+// rank: the live payload can carry rank -1 next to a real level and XP, and
+// treating that as "not listed" hid real levels behind a dash.
+export function hasSkillLevel(s) {
+  return !!s && typeof s.level === "number" && s.level > 0;
+}
+
 function mapSkill(s) {
   const level = Math.max(1, rankedValue(s.level) || 1);
   const xp = rankedValue(s.xp);
@@ -115,6 +122,17 @@ function mapActivity(a) {
   };
 }
 
+// Alphabetical by display name. The hiscores list bosses roughly
+// alphabetically but append each new one at the end (Brutus, Mad Angel and
+// Maggot King all trail the list), so their own order reads as unsorted.
+export function compareNames(a, b) {
+  return a.localeCompare(b, "en", { sensitivity: "base" });
+}
+
+export function byName(a, b) {
+  return compareNames(a.name, b.name);
+}
+
 export function mapHiscoresToDisplayItems(data) {
   if (!data || !Array.isArray(data.skills)) return [];
 
@@ -124,8 +142,10 @@ export function mapHiscoresToDisplayItems(data) {
 
   const activities = (data.activities || []).map(mapActivity);
 
+  // Bosses alphabetically; activities keep the hiscores' own grouping (clue
+  // tiers together, minigames together), which already reads well.
   return skills
-    .concat(activities.filter(function (i) { return i.category === "bosses"; }))
+    .concat(activities.filter(function (i) { return i.category === "bosses"; }).sort(byName))
     .concat(activities.filter(function (i) { return i.category === "activities"; }));
 }
 

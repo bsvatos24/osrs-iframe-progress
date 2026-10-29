@@ -18,7 +18,7 @@ import {
 import { gridIcon, iconButton, refreshIcon } from "./components.js";
 import { applyTier, button, el, img, replaceChildren } from "./dom.js";
 import { formatClock, slug } from "./format.js";
-import { mapHiscoresToDisplayItems } from "./model.js";
+import { byName, mapHiscoresToDisplayItems } from "./model.js";
 import { maxTier } from "./osrs.js";
 import { getBucket, observeBucket, onBucketChange } from "./mode.js";
 import { invalidate, flush, setPainter, state } from "./store.js";
@@ -242,7 +242,9 @@ function getPickerItems() {
     const byName = new Map(filtered.map(function (s) { return [s.name, s]; }));
     return SKILL_GRID_ORDER.map(function (n) { return byName.get(n); }).filter(Boolean);
   }
-  // Busiest first is more useful than alphabetical for kill counts.
+  // Bosses alphabetically, the same order they cycle in.
+  if (state.category === "bosses") return filtered.slice().sort(byName);
+  // Activities busiest first.
   return filtered.slice().sort(function (a, b) {
     if (b.kills !== a.kills) return b.kills - a.kills;
     return a.name.localeCompare(b.name);

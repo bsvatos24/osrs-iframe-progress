@@ -9,7 +9,7 @@ import {
   xpForLevel, KC_MILESTONES, MAX_SKILL_LEVEL, MAX_SKILL_XP
 } from "../osrs.js";
 import { formatCompact, formatRank, iconForActivity, iconForSkill } from "../format.js";
-import { activityTotals, isRanked, rankedValue, skillTotals } from "../model.js";
+import { activityTotals, hasSkillLevel, isRanked, rankedValue, skillTotals } from "../model.js";
 import { gains } from "../history.js";
 import { card, icon, link, list, notice, pageHead, playerHref, stats } from "./parts.js";
 
@@ -92,26 +92,26 @@ function skillGrid(skills) {
 }
 
 function skillTile(s, i) {
-  const ranked = isRanked(s.rank);
+  const listed = hasSkillLevel(s);
   const level = Math.max(1, rankedValue(s.level) || 1);
   const xp = rankedValue(s.xp);
   const tier = maxTier(level, xp);
 
   const tile = applyTier(el("div", "sk"), tier, i);
-  tile.title = ranked ? s.name + ": " + xp.toLocaleString() + " XP" : s.name + ": not on the hiscores";
+  tile.title = listed ? s.name + ": " + xp.toLocaleString() + " XP" : s.name + ": not on the hiscores";
   tile.appendChild(icon(iconForSkill(s.name), s.name));
   tile.appendChild(el("span", "nm", s.name));
 
   const lv = el("span", "lv mx-num");
   if (tier === "200") lv.appendChild(el("span", "prism", String(level)));
-  else lv.textContent = ranked ? String(level) : "\u2013";
+  else lv.textContent = listed ? String(level) : "\u2013";
   tile.appendChild(lv);
 
   let pct;
   let note;
-  if (!ranked) {
+  if (!listed) {
     pct = 0;
-    note = "Not ranked yet";
+    note = "Not on the hiscores yet";
   } else if (tier === "200") {
     pct = 100;
     note = "200M";

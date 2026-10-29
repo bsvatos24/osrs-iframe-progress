@@ -4,7 +4,7 @@
 // Three pages behind hash routes, so any of them can be bookmarked or sent:
 //   #overview                 standings, gains, about to level, most killed
 //   #player-<name>            one member in full
-//   #compare / #compare-bosses  everyone side by side
+//   #compare / #compare-bosses / #compare-activities  everyone side by side
 //
 // Every page renders from one multi-player fetch, so moving between them
 // costs no requests. The kiosk (kiosk.js) shares the data layer and the 99 /
@@ -123,6 +123,7 @@ function parseRoute() {
     return { page: "player", member: member };
   }
   if (hash === "compare-bosses") return { page: "compare", mode: "bosses" };
+  if (hash === "compare-activities") return { page: "compare", mode: "activities" };
   if (hash === "compare") return { page: "compare", mode: "skills" };
   return { page: "overview" };
 }

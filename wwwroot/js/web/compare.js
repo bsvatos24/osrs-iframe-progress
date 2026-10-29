@@ -1,30 +1,37 @@
 // ============================================================
-// Compare: everyone side by side, by skill or by boss.
+// Compare: everyone side by side, by skill, boss or activity.
 // ============================================================
 
 import { applyTier, el } from "../dom.js";
-import { SKILL_GRID_ORDER } from "../constants.js";
+import { BOSS_NAMES, SKILL_GRID_ORDER } from "../constants.js";
 import { maxTier } from "../osrs.js";
 import { iconForActivity, iconForSkill } from "../format.js";
-import { activityTotals, isRanked, rankedValue, skillTotals, teamEntryTotals } from "../model.js";
+import { activityTotals, compareNames, hasSkillLevel, rankedValue, skillTotals } from "../model.js";
 import { card, icon, link, pageHead, playerHref } from "./parts.js";
+
+const BLURBS = {
+  skills: "Everyone side by side. \u25B2 marks the most XP in each row; hover a level for its XP.",
+  bosses: "Everyone side by side, A to Z. \u25B2 marks the most kills in each row.",
+  activities: "Minigames, clue scrolls and the rest of the hiscores. \u25B2 marks the highest in each row."
+};
 
 export function comparePage(members, mode) {
   const page = document.createDocumentFragment();
-  const bosses = mode === "bosses";
-
-  page.appendChild(pageHead("Compare",
-    bosses
-      ? "Everyone side by side. \u25B2 marks the most kills in each row."
-      : "Everyone side by side. \u25B2 marks the most XP in each row; hover a level for its XP.",
-    segment(mode)));
+  page.appendChild(pageHead("Compare", BLURBS[mode], segment(mode)));
 
   const table = el("table", "matrix");
   table.appendChild(headRow(members));
-  table.appendChild(bosses ? bossBody(members) : skillBody(members));
-  table.appendChild(bosses
-    ? footRow(members, "Total KC", function (d) { return activityTotals(d).bossKc; })
-    : footRow(members, "Total level", function (d) { return skillTotals(d).level; }));
+  if (mode === "skills") {
+    table.appendChild(skillBody(members));
+    table.appendChild(footRow(members, "Total level", function (d) { return skillTotals(d).level; }));
+  } else if (mode === "bosses") {
+    table.appendChild(entryBody(members, "bosses"));
+    table.appendChild(footRow(members, "Total KC", function (d) { return activityTotals(d).bossKc; }));
+  } else {
+    // No total row: these rows mix counts with ratings and points, and clue
+    // tiers repeat "Clue Scrolls (all)", so a sum would mean nothing.
+    table.appendChild(entryBody(members, "activities"));
+  }
 
   const wrap = el("div", "tablewrap");
   wrap.appendChild(table);
@@ -37,7 +44,11 @@ export function comparePage(members, mode) {
 function segment(mode) {
   const seg = el("nav", "seg");
   seg.setAttribute("aria-label", "Compare by");
-  [["skills", "#compare", "Skills"], ["bosses", "#compare-bosses", "Bosses"]].forEach(function (opt) {
+  [
+    ["skills", "#compare", "Skills"],
+    ["bosses", "#compare-bosses", "Bosses"],
+    ["activities", "#compare-activities", "Activities"]
+  ].forEach(function (opt) {
     const a = link(opt[1], null, opt[2]);
     if (opt[0] === mode) a.setAttribute("aria-current", "page");
     seg.appendChild(a);
@@ -74,10 +85,10 @@ function skillBody(members) {
   SKILL_GRID_ORDER.forEach(function (skill) {
     const values = members.map(function (m) {
       const s = m.data && m.data.skills.find(function (x) { return x.name === skill; });
-      return s ? { level: Math.max(1, rankedValue(s.level) || 1), xp: rankedValue(s.xp), ranked: isRanked(s.rank) } : null;
+      return s ? { level: Math.max(1, rankedValue(s.level) || 1), xp: rankedValue(s.xp), listed: hasSkillLevel(s) } : null;
     });
     // The lead is the most XP, not the highest level: two 99s are not a tie.
-    const top = Math.max(0, ...values.map(function (v) { return v ? v.xp : 0; }));
+    const top = leader(values.map(function (v) { return v ? v.xp : null; }));
 
     const tr = el("tr");
     tr.appendChild(rowHead(iconForSkill(skill), skill));
@@ -85,11 +96,11 @@ function skillBody(members) {
       const td = el("td");
       if (!v) {
         td.appendChild(dashCell("Hiscores unavailable"));
-      } else if (!v.ranked) {
-        td.appendChild(dashCell(members[i].name + " \u00B7 " + skill + ": not ranked yet"));
+      } else if (!v.listed) {
+        td.appendChild(dashCell(members[i].name + " \u00B7 " + skill + ": not on the hiscores yet"));
       } else {
         const tier = maxTier(v.level, v.xp);
-        const cell = applyTier(el("div", "lvcell" + (top > 0 && v.xp === top ? " lead" : "")), tier, seed++);
+        const cell = applyTier(el("div", "lvcell" + (v.xp === top ? " lead" : "")), tier, seed++);
         cell.title = members[i].name + " \u00B7 " + skill + ": " + v.xp.toLocaleString() + " XP";
         cell.appendChild(tier === "200"
           ? el("span", "prism", "200M")
@@ -103,32 +114,39 @@ function skillBody(members) {
   return tbody;
 }
 
-function bossBody(members) {
+// One row per boss (kind "bosses") or per activity, for every entry somebody
+// has a score in. Bosses run alphabetically; activities keep the hiscores'
+// own order - clue tiers together, minigames together - as on the kiosk.
+function entryBody(members, kind) {
   const tbody = el("tbody");
-  // Only bosses somebody has killed, biggest team total first.
-  const bosses = teamEntryTotals(members, "bosses");
+  const names = entryNames(members, kind === "bosses");
 
-  if (bosses.length === 0) {
+  if (names.length === 0) {
     const tr = el("tr");
-    const td = el("td", "empty", "No boss kills yet.");
+    const td = el("td", "empty", kind === "bosses" ? "No boss kills yet." : "Nothing on the hiscores yet.");
     td.colSpan = members.length + 1;
     tr.appendChild(td);
     tbody.appendChild(tr);
     return tbody;
   }
 
-  bosses.forEach(function (boss) {
+  names.forEach(function (name) {
+    const scores = members.map(function (m) {
+      if (!m.data) return null;
+      const row = (m.data.activities || []).find(function (a) { return a.name === name; });
+      return rankedValue(row && row.score);
+    });
+    const top = leader(scores);
+
     const tr = el("tr");
-    tr.appendChild(rowHead(iconForActivity(boss.name), boss.name));
-    members.forEach(function (m) {
+    tr.appendChild(rowHead(iconForActivity(name), name));
+    scores.forEach(function (score) {
       const td = el("td");
-      if (!m.data) {
+      if (score === null) {
         td.appendChild(dashCell("Hiscores unavailable"));
       } else {
-        const row = (m.data.activities || []).find(function (a) { return a.name === boss.name; });
-        const kc = rankedValue(row && row.score);
-        const cell = el("div", "lvcell" + (kc > 0 && kc === boss.best ? " lead" : ""));
-        if (kc > 0) cell.textContent = kc.toLocaleString();
+        const cell = el("div", "lvcell" + (score === top ? " lead" : ""));
+        if (score > 0) cell.textContent = score.toLocaleString();
         else cell.appendChild(el("span", "dimnum", "\u2013"));
         td.appendChild(cell);
       }
@@ -137,6 +155,33 @@ function bossBody(members) {
     tbody.appendChild(tr);
   });
   return tbody;
+}
+
+// Names in the order the hiscores send them - every payload lists every
+// entry, so the first one read gives the order the kiosk cycles in - kept to
+// those somebody has a score in.
+function entryNames(members, bosses) {
+  const scored = new Set();
+  const order = [];
+  members.forEach(function (m) {
+    ((m.data && m.data.activities) || []).forEach(function (a) {
+      if (BOSS_NAMES.has(a.name) !== bosses) return;
+      if (order.indexOf(a.name) === -1) order.push(a.name);
+      if (rankedValue(a.score) > 0) scored.add(a.name);
+    });
+  });
+  const names = order.filter(function (n) { return scored.has(n); });
+  return bosses ? names.sort(compareNames) : names;
+}
+
+// The value that earns a row's lead marker, or null for none: nobody has
+// scored, or everyone ties - a marker on every cell says nothing.
+function leader(values) {
+  const real = values.filter(function (v) { return v !== null; });
+  const top = Math.max(0, ...real);
+  if (top <= 0) return null;
+  if (real.length > 1 && real.every(function (v) { return v === top; })) return null;
+  return top;
 }
 
 function footRow(members, label, value) {
