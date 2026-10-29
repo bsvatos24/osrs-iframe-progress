@@ -3,9 +3,16 @@
 // Pure builders - they take data and return nodes, and never read state.
 // ============================================================
 
-import { clamp, segmentFillPct } from "./osrs.js";
+import { clamp, maxTier, pctTo200m, segmentFillPct } from "./osrs.js";
 import { fmt, formatRank, progressColor } from "./format.js";
-import { button, el, img, svg, svgText } from "./dom.js";
+import { applyTier, button, el, img, svg, svgText } from "./dom.js";
+
+// Gradient ids must be unique in the document; several gauges share a page.
+let gradientSeq = 0;
+const TONES = {
+  gold: [["0", "var(--gold)"], ["1", "var(--gold-ink)"]],
+  prism: [["0", "var(--p1)"], [".35", "var(--p2)"], [".7", "var(--p3)"], ["1", "var(--p4)"]]
+};
 
 // --- Arc gauge -------------------------------------------------------------
 // `size` is supplied by the caller so the gauge can scale with its container
@@ -43,9 +50,26 @@ export function arcGauge(opts) {
     d: path, class: "gaugeTrack", "stroke-width": stroke, fill: "none"
   }));
 
+  // opts.tone: "gold" for a 99, "prism" for 200M; the accent otherwise.
+  let toneStroke = null;
+  if (opts.tone && TONES[opts.tone]) {
+    const id = "gauge-tone-" + (++gradientSeq);
+    const grad = svg("linearGradient", { id: id, x1: "0", y1: "1", x2: "1", y2: "0" });
+    TONES[opts.tone].forEach(function (stop) {
+      const s = svg("stop", { offset: stop[0] });
+      s.style.stopColor = stop[1];
+      grad.appendChild(s);
+    });
+    const defs = svg("defs", {});
+    defs.appendChild(grad);
+    root.appendChild(defs);
+    toneStroke = "url(#" + id + ")";
+  }
+
   const fill = svg("path", {
     d: path, class: "gaugeFill", "stroke-width": stroke, fill: "none"
   });
+  if (toneStroke) fill.style.stroke = toneStroke;
   fill.style.strokeDasharray = filledLen + " " + Math.max(0, arcLen - filledLen);
   root.appendChild(fill);
 
@@ -58,10 +82,12 @@ export function arcGauge(opts) {
 
   if (opts.centerMainParts) {
     root.appendChild(svgText(c, yTop, "gaugeTextMain", opts.centerMainParts.top));
-    root.appendChild(svg("line", {
+    const line = svg("line", {
       x1: c - size * 0.30, x2: c + size * 0.30, y1: rule, y2: rule,
       class: "gaugeFracLine", "stroke-width": 2, "stroke-linecap": "round"
-    }));
+    });
+    if (toneStroke) line.style.stroke = toneStroke;
+    root.appendChild(line);
     root.appendChild(svgText(c, yBottom, "gaugeTextMain", opts.centerMainParts.bottom));
   }
   if (opts.centerSub) root.appendChild(svgText(c, ySub, "gaugeTextSub", opts.centerSub));
@@ -125,21 +151,33 @@ function compactMilestone(n) {
 }
 
 // --- Skill tile (Total view) ----------------------------------------------
-export function skillTile(item) {
+export function skillTile(item, seed) {
   const level = item.skillLevel || 0;
-  const pct = clamp(item.levelProgressPct || 0, 0, 100);
+  const tier = maxTier(level, item.skillXp || 0);
 
-  const tile = el("div", "skillTile");
+  const tile = applyTier(el("div", "skillTile"), tier, seed);
   const top = el("div", "skillTileTop");
   top.appendChild(img(item.iconUrl, item.name, "skillTileIcon"));
   top.appendChild(el("div", "skillTileName", item.name));
-  top.appendChild(el("div", "skillTileLevel", level));
+  top.appendChild(el("div", "skillTileLevel mx-num", level));
   tile.appendChild(top);
 
-  const bar = el("div", "skillTileBar");
+  // At 200M there is nothing left to measure, so the label replaces the bar.
+  if (tier === "200") {
+    tile.appendChild(el("div", "skillTile200 prism", "200M"));
+    return tile;
+  }
+
+  const bar = el("div", "skillTileBar mx-bar");
   const barFill = el("div", "skillTileBarFill");
-  barFill.style.width = pct + "%";
-  barFill.style.backgroundColor = progressColor(pct);
+  if (tier === "max") {
+    // Colour comes from treatments.css: the bar now counts toward 200M.
+    barFill.style.width = pctTo200m(item.skillXp || 0) + "%";
+  } else {
+    const pct = clamp(item.levelProgressPct || 0, 0, 100);
+    barFill.style.width = pct + "%";
+    barFill.style.backgroundColor = progressColor(pct);
+  }
   bar.appendChild(barFill);
   tile.appendChild(bar);
   return tile;

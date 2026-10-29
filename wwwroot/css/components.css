@@ -467,3 +467,20 @@
 .pickerIcon.iconFallback{ font-size: 11px; }
 .upcomingIcon.iconFallback,
 .gimSkillIcon.iconFallback{ font-size: 8px; }
+/* The Skills header disc picks up the card's 99 / 200M treatment. */
+.headerCenter.k-max .iconWrap{
+  border: 2px solid var(--gold-ink);
+  box-shadow: 0 0 0 3px rgba(232,181,58,0.28);
+}
+
+.headerCenter.k-200 .iconWrap{
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--accent), var(--accent)) padding-box,
+    conic-gradient(from var(--spin), var(--p1), var(--p2), var(--p3), var(--p4), var(--p1)) border-box;
+  animation: mx-spin 5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .headerCenter.k-200 .iconWrap{ animation: none; }
+}

@@ -32,7 +32,7 @@ function totalGrid(items) {
 
   const wrap = el("div", "totalGridWrap");
   const grid = el("div", "totalGrid");
-  ordered.forEach(function (s) { grid.appendChild(skillTile(s)); });
+  ordered.forEach(function (s, i) { grid.appendChild(skillTile(s, i)); });
   wrap.appendChild(grid);
 
   const footer = el("div", "totalFooter");

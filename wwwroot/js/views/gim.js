@@ -5,9 +5,9 @@
 // panel. It never substitutes invented level-1 data for a missing fetch.
 // ============================================================
 
-import { el, img } from "../dom.js";
+import { applyTier, el, img } from "../dom.js";
 import { GIM_SKILL_ORDER } from "../constants.js";
-import { levelProgress } from "../osrs.js";
+import { levelProgress, maxTier, pctTo200m } from "../osrs.js";
 import { config } from "../config.js";
 import { formatClock, iconForSkill, progressColor } from "../format.js";
 import { rankedValue, skillTotals } from "../model.js";
@@ -125,24 +125,34 @@ function gimPanel(name, result) {
   const byName = new Map(result.data.skills.map(function (s) { return [s.name, s]; }));
   const grid = el("div", "gimSkillsGrid");
 
-  GIM_SKILL_ORDER.flat().forEach(function (skillName) {
+  GIM_SKILL_ORDER.flat().forEach(function (skillName, i) {
     const s = byName.get(skillName);
     const level = Math.max(1, rankedValue(s && s.level) || 1);
     const xp = rankedValue(s && s.xp);
-    const pct = levelProgress(level, xp).pct;
+    const tier = maxTier(level, xp);
 
-    const cell = el("div", "gimSkillCell");
+    const cell = applyTier(el("div", "gimSkillCell"), tier, i + name.length);
     const top = el("div", "gimSkillTop");
     top.appendChild(img(iconForSkill(skillName), skillName, "gimSkillIcon"));
-    top.appendChild(el("div", "gimSkillLvl", level));
+    top.appendChild(el("div", "gimSkillLvl mx-num", level));
     cell.appendChild(top);
 
-    const track = el("div", "gimSkillBarTrack");
-    const fill = el("div", "gimSkillBarFill");
-    fill.style.width = pct + "%";
-    fill.style.background = progressColor(pct);
-    track.appendChild(fill);
-    cell.appendChild(track);
+    // At 200M the label replaces the bar; at 99 the bar counts toward 200M.
+    if (tier === "200") {
+      cell.appendChild(el("div", "gimSkill200 prism", "200M"));
+    } else {
+      const track = el("div", "gimSkillBarTrack mx-bar");
+      const fill = el("div", "gimSkillBarFill");
+      if (tier === "max") {
+        fill.style.width = pctTo200m(xp) + "%";
+      } else {
+        const pct = levelProgress(level, xp).pct;
+        fill.style.width = pct + "%";
+        fill.style.background = progressColor(pct);
+      }
+      track.appendChild(fill);
+      cell.appendChild(track);
+    }
 
     grid.appendChild(cell);
   });

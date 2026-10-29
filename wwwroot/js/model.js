@@ -194,3 +194,63 @@ export function activityEntries(data, kind) {
     })
     .filter(function (row) { return row.score > 0; });
 }
+// Every unfinished level-up across a group, furthest through its level first.
+// `members` is [{ name, data }] with data a raw hiscores payload (or null).
+// Ranking by raw XP left instead always filled the list with the lowest-level
+// teammate, because low levels need the least XP. Ties go to less XP left,
+// then name, so the order is stable between polls. Shared by the kiosk Team
+// view and the web Overview so the two never disagree.
+export function levelUpCandidates(members) {
+  const candidates = [];
+
+  members.forEach(function (member) {
+    if (!member.data || !Array.isArray(member.data.skills)) return;
+    member.data.skills.forEach(function (s) {
+      if (s.name === "Overall") return;
+      const level = Math.max(1, rankedValue(s.level) || 1);
+      const xp = rankedValue(s.xp);
+
+      // A 99 has no next level, and an unstarted skill is not about to do
+      // anything.
+      if (level >= MAX_SKILL_LEVEL || xp <= 0) return;
+
+      candidates.push({
+        player: member.name,
+        skill: s.name,
+        level: level,
+        remaining: Math.max(0, xpForLevel(level + 1) - xp),
+        pct: levelProgress(level, xp).pct
+      });
+    });
+  });
+
+  return candidates.sort(function (a, b) {
+    if (b.pct !== a.pct) return b.pct - a.pct;
+    if (a.remaining !== b.remaining) return a.remaining - b.remaining;
+    return a.player.localeCompare(b.player) || a.skill.localeCompare(b.skill);
+  });
+}
+
+// Group totals per boss (kind "bosses") or per counted activity, biggest
+// first, each with whoever leads it: [{ name, total, best, leader }].
+export function teamEntryTotals(members, kind) {
+  const totals = new Map();
+
+  members.forEach(function (member) {
+    if (!member.data) return;
+    activityEntries(member.data, kind).forEach(function (entry) {
+      const acc = totals.get(entry.name) || { name: entry.name, total: 0, best: 0, leader: null };
+      acc.total += entry.score;
+      if (entry.score > acc.best) {
+        acc.best = entry.score;
+        acc.leader = member.name;
+      }
+      totals.set(entry.name, acc);
+    });
+  });
+
+  return [...totals.values()].sort(function (a, b) {
+    if (b.total !== a.total) return b.total - a.total;
+    return a.name.localeCompare(b.name);
+  });
+}

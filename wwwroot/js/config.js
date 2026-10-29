@@ -22,7 +22,6 @@
 import { DEFAULT_PLAYER, PLAYER_OPTIONS } from "./constants.js";
 
 const params = new URLSearchParams(window.location.search);
-const MODE_KEY = "osrsgim.mode";
 const VIEWS = new Set(["skills", "bosses", "activities", "total", "gim", "team"]);
 const BUCKETS = new Set(["xl", "l", "m", "tall"]);
 const GIM_STYLES = new Set(["panels", "cycle", "summary"]);
@@ -54,23 +53,16 @@ function oneOf(key, allowed) {
   return allowed.has(v) ? v : null;
 }
 
-// Explicit parameter wins, then a remembered choice, then detection. Being in
-// an iframe is a good signal for kiosk but never the only one - the override
-// is what makes kiosk mode debuggable in a normal browser tab.
+// Decided once, by the inline script in index.html's <head>, because that is
+// what picks which app and which stylesheets load. ?mode= wins; otherwise
+// being inside an iframe means the Edge. Re-derived here only if that script
+// did not run (a page that imports this module without it).
 function resolveMode() {
+  const set = document.documentElement.dataset.mode;
+  if (set === "kiosk" || set === "web") return set;
   const explicit = oneOf("mode", new Set(["kiosk", "web"]));
   if (explicit) return explicit;
-
-  try {
-    const stored = localStorage.getItem(MODE_KEY);
-    if (stored === "kiosk" || stored === "web") return stored;
-  } catch (e) { /* storage disabled */ }
-
   return window.self !== window.top ? "kiosk" : "web";
-}
-
-export function rememberMode(mode) {
-  try { localStorage.setItem(MODE_KEY, mode); } catch (e) { /* ignore */ }
 }
 
 function resolvePlayers() {

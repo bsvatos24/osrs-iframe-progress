@@ -515,3 +515,25 @@
   color: var(--muted);
   min-width: 44px;
 }
+/* --- 99 / 200M labels (box treatments live in treatments.css) ---------- */
+
+/* Replaces the bar in a 200M cell. Sized off the cell like the bar it
+   replaces: px first, then the cq size for engines with container units. */
+.gimSkill200{
+  font-weight: 900;
+  font-size: 8px;
+  font-size: clamp(7px, 18cqh, 12px);
+  line-height: 1;
+  letter-spacing: .06em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.skillTile200{
+  margin-top: 6px;
+  font-weight: 900;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: .08em;
+  text-align: center;
+}

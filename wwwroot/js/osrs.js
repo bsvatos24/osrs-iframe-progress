@@ -68,3 +68,24 @@ export function segmentFillPct(current, from, to) {
   if (current >= to) return 100;
   return clamp(((current - from) / (to - from)) * 100, 0, 100);
 }
+// Which max treatment a skill earns: "200" at the 200M XP cap, "max" at level
+// 99, otherwise null. 200M wins because every 200M skill is also a 99.
+export function maxTier(level, xp) {
+  if (xp >= MAX_SKILL_XP) return "200";
+  if (level >= MAX_SKILL_LEVEL) return "max";
+  return null;
+}
+
+// Progress toward 200M as a percentage - what the bar shows once a skill is 99.
+export function pctTo200m(xp) {
+  return clamp((xp / MAX_SKILL_XP) * 100, 0, 100);
+}
+
+// The tier a whole player earns: every skill at 200M, else every skill at 99.
+export function playerTier(skills) {
+  const real = (skills || []).filter(function (s) { return s.name !== "Overall"; });
+  if (real.length === 0) return null;
+  if (real.every(function (s) { return s.xp >= MAX_SKILL_XP; })) return "200";
+  if (real.every(function (s) { return s.level >= MAX_SKILL_LEVEL; })) return "max";
+  return null;
+}

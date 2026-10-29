@@ -79,3 +79,11 @@ export function replaceChildren(container, ...nodes) {
   container.replaceChildren(...nodes.filter(Boolean));
   return container;
 }
+// Marks a box with its 99 / 200M treatment (treatments.css). `seed` sets the
+// glow's phase, so neighbouring boxes do not pulse in step.
+export function applyTier(node, tier, seed) {
+  if (!tier) return node;
+  node.classList.add(tier === "200" ? "k-200" : "k-max");
+  node.style.setProperty("--d", "-" + (((seed || 0) * 0.77) % 3.2).toFixed(2) + "s");
+  return node;
+}

@@ -1,0 +1,337 @@
+/* =========================================================================
+   Web app (browser, not the XENEON EDGE).
+
+   A scrolling web page instead of one-screen kiosk panels: a sticky app bar
+   with page navigation, and each page a column of cards capped at 1200px.
+   Follows the system light/dark setting. The kiosk never loads this file.
+
+   treatments.css loads after this and reads the gold / prism tokens below.
+   ========================================================================= */
+
+:root{
+  --bg:#f5f3f7;
+  --surface:#ffffff;
+  --surface-2:#eeeaf2;
+  --line:#e1dbe7;
+  --text:#1b1720;
+  --muted:#6b6375;
+  --accent:#b02aa6;
+  --accent-soft:rgba(176,42,166,.10);
+  --good:#16834a;
+  --warn-bg:#fff4dc;
+  --warn-line:#e9c46a;
+  --warn-text:#6b4a00;
+  --bad:#b4232a;
+  --track:#e6e1ec;
+  --shadow-sm:0 1px 2px rgba(27,23,32,.12);
+
+  /* 99 / 200M (treatments.css) */
+  --gold:#c08b1c;
+  --gold-ink:#7f5300;
+  --gold-fill:rgba(232,181,58,.17);
+  --gold-glow:rgba(214,160,40,.55);
+  --prism-base:#ffffff;
+  --p1:#d23a9f; --p2:#c08a12; --p3:#1798b0; --p4:#7a52d4;
+  --pf1:rgba(210,58,159,.16); --pf2:rgba(192,138,18,.11);
+  --pf3:rgba(23,152,176,.14); --pf4:rgba(122,82,212,.16);
+  --pg1:rgba(210,58,159,.40); --pg2:rgba(192,138,18,.40);
+  --pg3:rgba(23,152,176,.40); --pg4:rgba(122,82,212,.40);
+
+  --f-display:"Chakra Petch", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-body:"IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f0d12;
+    --surface:#17151c;
+    --surface-2:#1f1c25;
+    --line:rgba(238,232,248,.10);
+    --text:#f2eff6;
+    --muted:#a39dae;
+    --accent:#ef50e7;
+    --accent-soft:rgba(239,80,231,.12);
+    --good:#4ade80;
+    --warn-bg:#2a2214;
+    --warn-line:#7a5b1c;
+    --warn-text:#f3d68f;
+    --bad:#ff7a7f;
+    --track:#2a2631;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.5);
+
+    --gold:#e8b53a;
+    --gold-ink:#ffd977;
+    --gold-fill:rgba(232,181,58,.13);
+    --gold-glow:rgba(232,181,58,.55);
+    --prism-base:#17121c;
+    --p1:#ff6ad5; --p2:#ffd977; --p3:#7cf0ff; --p4:#b48cff;
+    --pf1:rgba(255,106,213,.22); --pf2:rgba(255,217,119,.14);
+    --pf3:rgba(124,240,255,.19); --pf4:rgba(180,140,255,.22);
+    --pg1:rgba(255,106,213,.42); --pg2:rgba(255,217,119,.42);
+    --pg3:rgba(124,240,255,.42); --pg4:rgba(180,140,255,.42);
+
+    color-scheme:dark;
+  }
+}
+
+*{ box-sizing:border-box; }
+html{ -webkit-text-size-adjust:100%; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--f-body);
+  font-size:15px;
+  line-height:1.5;
+  font-variant-numeric:tabular-nums;
+}
+/* Paints the notch band above the sticky app bar. */
+body::before{ content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top, 0px); z-index:10; background:var(--surface); }
+a{ color:inherit; }
+h1, h2{ font-family:var(--f-display); margin:0; text-wrap:balance; letter-spacing:.01em; }
+h1{ font-size:30px; font-weight:700; line-height:1.1; }
+h2{ font-size:19px; font-weight:600; }
+p{ margin:0; }
+button{ font:inherit; }
+a:focus-visible, button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+.label{ font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+.muted{ color:var(--muted); }
+.wrap{
+  max-width:1200px;
+  margin:0 auto;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Icons are pixel art from the game; a missing one becomes a monogram. */
+.ico{ width:22px; height:22px; object-fit:contain; image-rendering:pixelated; flex:none; }
+.ico.iconFallback{
+  display:inline-grid; place-items:center; border-radius:6px;
+  background:var(--surface-2); color:var(--muted);
+  font:700 9px/1 var(--f-display); letter-spacing:.02em;
+}
+
+/* ---------- App bar ---------- */
+.appbar{
+  position:sticky;
+  top:env(safe-area-inset-top, 0px);
+  z-index:5;
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+}
+.appbar .wrap{ display:flex; align-items:center; gap:24px; height:58px; }
+.brand{
+  display:flex; align-items:center; gap:10px;
+  font-family:var(--f-display); font-weight:700; font-size:17px;
+  white-space:nowrap; text-decoration:none;
+}
+.brand .ico{ width:22px; height:22px; }
+.nav{ display:flex; gap:4px; height:100%; }
+.nav a{
+  display:flex; align-items:center; padding:0 12px;
+  text-decoration:none; color:var(--muted);
+  font-weight:600; font-size:14px;
+  border-bottom:2px solid transparent;
+}
+.nav a[aria-current="page"]{ color:var(--text); border-bottom-color:var(--accent); }
+.nav a:hover{ color:var(--text); }
+.updated{ margin-left:auto; display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted); white-space:nowrap; }
+.iconbtn{
+  width:34px; height:34px; border-radius:8px;
+  border:1px solid var(--line); background:var(--surface); color:var(--text);
+  display:grid; place-items:center; cursor:pointer; padding:0;
+}
+.iconbtn:disabled{ cursor:default; opacity:.6; }
+.iconbtn svg{ width:16px; height:16px; }
+.iconbtn .spin{ animation:web-spin 900ms linear infinite; }
+@keyframes web-spin{ to{ transform:rotate(360deg); } }
+
+/* ---------- Page ---------- */
+main{ padding-block:28px 64px; }
+.page{ display:flex; flex-direction:column; gap:28px; }
+.page-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.page-head p{ color:var(--muted); margin-top:6px; max-width:62ch; }
+.card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; min-width:0; }
+.card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:4px 12px; margin-bottom:12px; flex-wrap:wrap; }
+.card-head p{ font-size:13px; color:var(--muted); }
+.cols{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; align-items:start; }
+.stack{ display:flex; flex-direction:column; gap:18px; min-width:0; }
+.empty{ color:var(--muted); font-size:14px; padding:6px 0; }
+
+.notice{
+  display:flex; gap:10px; align-items:flex-start;
+  padding:10px 14px; border-radius:10px;
+  background:var(--warn-bg); border:1px solid var(--warn-line); color:var(--warn-text);
+  font-size:14px;
+}
+.notice.bad{ color:var(--bad); }
+
+.loading{ display:flex; flex-direction:column; align-items:center; gap:12px; padding:80px 0; color:var(--muted); }
+.loading .ring{
+  width:28px; height:28px; border-radius:50%;
+  border:3px solid var(--track); border-top-color:var(--accent);
+  animation:web-spin 900ms linear infinite;
+}
+
+/* ---------- Stat strip ---------- */
+.stats{
+  display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden;
+}
+.stat{ background:var(--surface); padding:14px 18px; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.stat b{ font-family:var(--f-display); font-size:24px; font-weight:600; line-height:1.25; }
+.stat small{ font-size:12.5px; color:var(--muted); }
+
+/* ---------- Meters ---------- */
+.meter{ height:8px; border-radius:999px; background:var(--track); overflow:hidden; min-width:0; }
+.meter > i{ display:block; height:100%; border-radius:999px; background:var(--accent); }
+
+/* ---------- Standings ----------
+   A div grid rather than a table: each row is a real box, so a maxed player's
+   row can take the same gold / prism border, fill and glow as a skill tile. */
+.standings{ display:flex; flex-direction:column; gap:6px; }
+.st-row{
+  display:grid;
+  grid-template-columns:40px minmax(0, 1.3fr) minmax(80px, 2fr) 84px 72px 72px 72px;
+  gap:12px; align-items:center;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid transparent;
+  background:var(--surface-2);
+}
+.st-row.st-head{
+  background:none; border:0; padding-block:0 2px;
+  font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600;
+}
+.st-row > *{ min-width:0; white-space:nowrap; }
+.st-row .num{ text-align:right; }
+.st-rank{ font-family:var(--f-display); font-weight:700; color:var(--accent); }
+.st-name{ font-weight:600; overflow:hidden; text-overflow:ellipsis; }
+.st-name a{ text-decoration:none; }
+.st-name a:hover{ text-decoration:underline; }
+.st-level{ font-weight:700; }
+.st-off{ opacity:.7; }
+.gain{ color:var(--good); font-weight:600; }
+.dimnum{ color:var(--muted); }
+
+/* ---------- Lists ---------- */
+.list{ display:flex; flex-direction:column; }
+.li{
+  display:grid;
+  grid-template-columns:24px minmax(0, 1fr) minmax(60px, 140px) auto;
+  gap:12px; align-items:center;
+  padding:9px 0; border-top:1px solid var(--line);
+}
+.li:first-child{ border-top:0; }
+.li .main{ font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.li .sub{ font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.li .val{ font-weight:600; text-align:right; font-size:14px; white-space:nowrap; }
+.more{
+  margin-top:8px; padding:7px 12px; border-radius:8px;
+  border:1px solid var(--line); background:var(--surface); color:var(--text);
+  font-weight:600; font-size:13px; cursor:pointer;
+}
+
+/* ---------- Player page ---------- */
+.chips{ display:flex; gap:6px; flex-wrap:wrap; }
+.chip{
+  text-decoration:none; padding:8px 12px; border-radius:999px;
+  border:1px solid var(--line); background:var(--surface);
+  font-weight:600; font-size:13.5px; color:var(--muted);
+}
+.chip:hover{ color:var(--text); }
+.chip[aria-current="page"]{ color:var(--text); border-color:var(--accent); background:var(--accent-soft); }
+
+.skills{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+.sk{
+  display:grid;
+  grid-template-columns:28px minmax(0, 1fr) auto;
+  grid-template-rows:auto auto;
+  column-gap:10px; row-gap:6px; align-items:center;
+  padding:10px 12px;
+  border:1px solid var(--line); border-radius:10px;
+  background:var(--surface);
+}
+.sk .ico{ grid-row:1 / span 2; width:26px; height:26px; }
+.sk .nm{ font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sk .lv{ font-family:var(--f-display); font-weight:700; font-size:20px; line-height:1; text-align:right; }
+.sk .bottom{ grid-column:2 / span 2; display:flex; align-items:center; gap:10px; min-width:0; }
+.sk .bar{ flex:1; height:6px; border-radius:999px; background:var(--track); overflow:hidden; min-width:40px; }
+/* Kept at one class so .k-max / .k-200 .mx-bar > * can recolour it. */
+.bar > i{ display:block; height:100%; border-radius:999px; background:var(--accent); }
+.sk .note{ font-size:12px; color:var(--muted); white-space:nowrap; }
+
+.clues{ display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:10px; }
+.clue{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 6px; border-radius:10px; background:var(--surface-2); min-width:0; }
+.clue .ico{ width:26px; height:26px; }
+.clue b{ font-family:var(--f-display); font-size:20px; line-height:1.2; }
+.clue span{ font-size:12px; color:var(--muted); }
+
+/* ---------- Compare ---------- */
+.seg{ display:flex; gap:4px; background:var(--surface-2); padding:4px; border-radius:10px; width:max-content; max-width:100%; }
+.seg a{ text-decoration:none; padding:7px 14px; border-radius:7px; font-weight:600; font-size:13.5px; color:var(--muted); }
+.seg a[aria-current="page"]{ background:var(--surface); color:var(--text); box-shadow:var(--shadow-sm); }
+.tablewrap{ overflow-x:auto; }
+/* Fixed layout so every player's column is the same width. */
+.matrix{ border-collapse:separate; border-spacing:4px; width:100%; min-width:680px; table-layout:fixed; }
+.matrix .corner{ width:190px; }
+.matrix th{
+  padding:6px 8px; text-align:center; white-space:nowrap;
+  font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600;
+}
+.matrix th a{ text-decoration:none; }
+.matrix th a:hover{ color:var(--text); }
+.matrix td{ padding:0; }
+.matrix .rowhead{
+  position:sticky; left:0; z-index:1;
+  background:var(--surface);
+  padding:4px 8px 4px 0;
+  white-space:nowrap; font-weight:600; font-size:14px; text-align:left;
+  text-transform:none; letter-spacing:0; color:var(--text);
+}
+.matrix .rowhead .ico{ width:20px; height:20px; vertical-align:middle; margin-right:8px; }
+.lvcell{
+  position:relative;
+  display:flex; align-items:center; justify-content:center;
+  height:38px; border-radius:8px;
+  background:var(--surface-2); border:1px solid transparent;
+  font-family:var(--f-display); font-weight:600; font-size:16px;
+}
+.lvcell.lead{ font-weight:700; }
+.lvcell.lead::before{
+  content:"\25B2"; position:absolute; top:3px; right:5px; z-index:1;
+  font-size:8px; color:var(--accent);
+}
+.matrix tfoot td{ font-family:var(--f-display); font-weight:700; text-align:center; padding:10px 4px 0; }
+.matrix tfoot .rowhead{ font-family:var(--f-body); }
+
+/* ---------- Narrow ---------- */
+@media (max-width:980px){
+  .skills{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .cols{ grid-template-columns:1fr; }
+  .stats{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .st-row{ grid-template-columns:32px minmax(0, 1fr) minmax(60px, 1fr) 72px 64px 64px 64px; gap:10px; }
+}
+@media (max-width:640px){
+  .appbar .wrap{ gap:12px; }
+  .nav a{ padding:0 8px; }
+  .updated .when{ display:none; }
+  .brand span{ display:none; }
+  h1{ font-size:24px; }
+  .card{ padding:14px; }
+  .skills{ grid-template-columns:1fr; }
+  .clues{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+  .li{ grid-template-columns:24px minmax(0, 1fr) auto; }
+  .li .meter, .li .meter-gap{ display:none; }
+  /* Rank, name, level and the two gain columns: the meter and XP go. */
+  .st-row{ grid-template-columns:24px minmax(0, 1fr) 52px 52px 52px; gap:8px; padding-inline:10px; }
+  .st-row .st-meter, .st-row .st-xp{ display:none; }
+  .stat{ padding:12px 14px; }
+  .stat b{ font-size:20px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .iconbtn .spin, .loading .ring{ animation-duration:2.4s; }
+}

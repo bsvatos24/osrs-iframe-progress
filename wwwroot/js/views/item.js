@@ -52,14 +52,16 @@ function primaryGauge(item) {
 
   // A maxed skill measures against 200m XP rather than a non-existent level 100.
   if (item.primaryUnit === "xp-200m") {
+    const capped = item.primaryCurrent >= MAX_SKILL_XP;
     return arcGauge({
       size: GAUGE_SIZE,
       value: item.primaryCurrent,
       max: MAX_SKILL_XP,
+      tone: capped ? "prism" : "gold",
       labelTop: item.primaryLabelTop,
       centerMainParts: { top: formatCompact(item.primaryCurrent), bottom: "200m" },
-      centerSub: formatCompact(remaining) + " XP Left",
-      centerHint: "To 200m XP"
+      centerSub: capped ? "Maxed" : formatCompact(remaining) + " XP Left",
+      centerHint: capped ? "200M reached" : "To 200m XP"
     });
   }
 
@@ -81,17 +83,20 @@ function secondaryGauge(item) {
 
   const target = item.secondaryTarget || 1;
   const remaining = Math.max(0, target - (item.secondaryCurrent || 0));
+  const toward200m = item.secondaryUnit === "xp-200m";
+  const capped = toward200m && remaining === 0;
 
   return arcGauge({
     size: GAUGE_SIZE,
     value: item.secondaryCurrent || 0,
     max: target,
+    tone: capped ? "prism" : toward200m ? "gold" : null,
     labelTop: item.secondaryLabelTop,
     centerMainParts: {
       top: formatCompact(item.secondaryCurrent || 0),
       bottom: formatCompact(target)
     },
-    centerSub: formatCompact(remaining) + " XP Left",
-    centerHint: item.secondaryUnit === "xp-200m" ? "To 200m XP" : "To 99"
+    centerSub: capped ? "Maxed" : formatCompact(remaining) + " XP Left",
+    centerHint: capped ? "200M reached" : toward200m ? "To 200m XP" : "To 99"
   });
 }

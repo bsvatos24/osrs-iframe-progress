@@ -6,6 +6,53 @@
   <meta name="color-scheme" content="dark" />
   <meta name="theme-color" content="#000000" />
 
+  <!-- Decide kiosk or web once, before any stylesheet loads, so each mode gets
+       only its own CSS and never flashes the other's. ?mode= wins; otherwise
+       being inside an iframe means the XENEON EDGE. app.js reads data-mode. -->
+  <script>
+    (function () {
+      var asked = new URLSearchParams(location.search).get("mode");
+      var mode = asked === "kiosk" || asked === "web" ? asked
+        : (window.self !== window.top ? "kiosk" : "web");
+      var root = document.documentElement;
+      root.dataset.mode = mode;
+
+      var sheets = mode === "kiosk"
+        ? ["tokens", "base", "components", "views", "layout", "treatments"]
+        : ["web", "treatments"];
+      sheets.forEach(function (name) {
+        var link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "wwwroot/css/" + name + ".css";
+        // Script-inserted stylesheets do not block rendering by default.
+        link.setAttribute("blocking", "render");
+        document.head.appendChild(link);
+      });
+
+      if (mode === "web") {
+        // The web app follows the system light/dark setting; the kiosk is
+        // always dark.
+        document.querySelector('meta[name="color-scheme"]').content = "light dark";
+        var tc = document.querySelector('meta[name="theme-color"]');
+        tc.content = "#f5f3f7";
+        tc.media = "(prefers-color-scheme: light)";
+        var dark = document.createElement("meta");
+        dark.name = "theme-color";
+        dark.content = "#0f0d12";
+        dark.media = "(prefers-color-scheme: dark)";
+        document.head.appendChild(dark);
+
+        // Display and body faces. Not render-blocking: display=swap falls back
+        // to the system stack in web.css if Google Fonts is slow or blocked.
+        var fonts = document.createElement("link");
+        fonts.rel = "stylesheet";
+        fonts.href = "https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700"
+          + "&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap";
+        document.head.appendChild(fonts);
+      }
+    })();
+  </script>
+
   <title>OSRS Progress Dashboard</title>
   <meta name="description" content="Old School RuneScape group ironman progress dashboard: skills, boss kill counts and team totals." />
 
@@ -13,12 +60,6 @@
   <meta property="og:title" content="OSRS Progress Dashboard" />
   <meta property="og:description" content="Live skill, boss and team-total tracking for our group ironman." />
   <link rel="icon" href="wwwroot/icons/skills/total.png" />
-
-  <link rel="stylesheet" href="wwwroot/css/tokens.css" />
-  <link rel="stylesheet" href="wwwroot/css/base.css" />
-  <link rel="stylesheet" href="wwwroot/css/components.css" />
-  <link rel="stylesheet" href="wwwroot/css/views.css" />
-  <link rel="stylesheet" href="wwwroot/css/layout.css" />
 
   <!-- Module scripts are deferred, so this runs after the document parses. -->
   <script type="module" src="wwwroot/js/app.js"></script>

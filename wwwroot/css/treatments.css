@@ -1,0 +1,102 @@
+/* =========================================================================
+   99 and 200M treatments, shared by the kiosk and web apps.
+
+   99   gold trim with ember glow: a gold fill and border inside the box, and
+        a gold glow outside it that brightens and dims. Each box runs on its
+        own phase (--d), so a maxed panel flickers instead of pulsing in step.
+   200M the same recipe in prism colours: a muted prismatic fill that drifts,
+        a glow that cycles hue, a turning prismatic border and a light sweep.
+
+   Loaded last so .k-max / .k-200 win over each app's own box rules.
+
+   Tokens each app defines (per theme where it has one):
+     --gold --gold-ink --gold-fill --gold-glow
+     --prism-base --p1..--p4 (solid) --pf1..--pf4 (fill tints) --pg1..--pg4 (glows)
+   Hooks in markup:
+     .k-max / .k-200  on the box
+     .mx-num          a number that turns gold at 99
+     .mx-bar          a progress track; its child is the fill
+     .prism           text drawn in the prism gradient
+   ========================================================================= */
+
+@property --spin{ syntax:"<angle>"; inherits:false; initial-value:0deg; }
+
+/* ---------- 99 ---------- */
+.k-max{
+  border-color:var(--gold);
+  background:var(--gold-fill);
+  animation:mx-ember 3.2s ease-in-out infinite;
+  animation-delay:var(--d, 0s);
+}
+.k-max .mx-num{ color:var(--gold-ink); }
+/* At 99 the bar stops measuring the way to a level 100 that does not exist and
+   counts toward 200M instead, in gold. */
+.k-max .mx-bar > *{ background:linear-gradient(90deg, var(--gold), var(--gold-ink)); }
+
+@keyframes mx-ember{
+  0%, 100%{ box-shadow:0 0 0 0 transparent; }
+  50%{ box-shadow:0 0 10px 2px var(--gold-glow); }
+}
+
+/* ---------- 200M ---------- */
+.k-200{
+  position:relative;
+  overflow:hidden;
+  /* Same 1px as an ordinary box, so marking one never shifts a grid. */
+  border:1px solid transparent;
+  background:
+    linear-gradient(115deg, var(--pf1), var(--pf2), var(--pf3), var(--pf4), var(--pf1)) padding-box,
+    linear-gradient(var(--prism-base), var(--prism-base)) padding-box,
+    conic-gradient(from var(--spin), var(--p1), var(--p2), var(--p3), var(--p4), var(--p1)) border-box;
+  background-size:300% 100%, auto, auto;
+  animation:
+    mx-spin 5s linear infinite,
+    mx-prismfill 10s ease-in-out infinite alternate,
+    mx-prismglow 6s ease-in-out infinite;
+  animation-delay:0s, 0s, var(--d, 0s);
+}
+.k-200::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(105deg, transparent 38%, rgba(255,255,255,.24) 50%, transparent 62%);
+  background-size:260% 100%;
+  background-position:130% 0;
+  mix-blend-mode:screen;
+  animation:mx-sheen 3.8s ease-in-out infinite;
+}
+.k-200 .mx-bar > *{ background:linear-gradient(90deg, var(--p1), var(--p2), var(--p3), var(--p4)); }
+
+.prism{
+  background:linear-gradient(90deg, var(--p2), var(--p1), var(--p3), var(--p4), var(--p2));
+  background-size:300% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  animation:mx-flow 5s linear infinite;
+}
+
+@keyframes mx-spin{ to{ --spin:360deg; } }
+@keyframes mx-prismfill{
+  from{ background-position:0% 0, 0 0, 0 0; }
+  to{ background-position:100% 0, 0 0, 0 0; }
+}
+@keyframes mx-prismglow{
+  0%, 100%{ box-shadow:0 0 9px 1px var(--pg1); }
+  25%{ box-shadow:0 0 12px 2px var(--pg2); }
+  50%{ box-shadow:0 0 9px 1px var(--pg3); }
+  75%{ box-shadow:0 0 12px 2px var(--pg4); }
+}
+@keyframes mx-sheen{
+  0%, 55%{ background-position:130% 0; }
+  100%{ background-position:-30% 0; }
+}
+@keyframes mx-flow{ to{ background-position:300% 0; } }
+
+@media (prefers-reduced-motion: reduce){
+  .k-max, .k-200, .k-200::after, .prism{ animation:none; }
+  .k-max{ box-shadow:0 0 8px 1px var(--gold-glow); }
+  .k-200{ box-shadow:0 0 10px 1px var(--pg4); }
+}

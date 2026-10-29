@@ -20,6 +20,18 @@
   --surface: rgba(255,255,255,0.10);
   --surface-border: rgba(255,255,255,0.22);
 
+  /* 99 and 200M (treatments.css). The kiosk is dark-only. */
+  --gold: #e8b53a;
+  --gold-ink: #ffd977;
+  --gold-fill: rgba(232,181,58,0.13);
+  --gold-glow: rgba(232,181,58,0.55);
+  --prism-base: #17121c;
+  --p1: #ff6ad5; --p2: #ffd977; --p3: #7cf0ff; --p4: #b48cff;
+  --pf1: rgba(255,106,213,0.22); --pf2: rgba(255,217,119,0.14);
+  --pf3: rgba(124,240,255,0.19); --pf4: rgba(180,140,255,0.22);
+  --pg1: rgba(255,106,213,0.42); --pg2: rgba(255,217,119,0.42);
+  --pg3: rgba(124,240,255,0.42); --pg4: rgba(180,140,255,0.42);
+
   --radius-card: 16px;
   --radius-tile: 12px;
   --radius-pill: 999px;

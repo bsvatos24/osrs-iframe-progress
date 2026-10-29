@@ -7,11 +7,10 @@
 // view already makes, so switching metric costs no requests.
 // ============================================================
 
-import { el, img } from "../dom.js";
-import { GIM_SKILL_ORDER } from "../constants.js";
-import { levelProgress, xpForLevel, MAX_SKILL_LEVEL, MAX_VIRTUAL_LEVEL } from "../osrs.js";
+import { applyTier, el, img } from "../dom.js";
+import { playerTier } from "../osrs.js";
 import { formatCompact, iconForActivity, iconForSkill, progressColor } from "../format.js";
-import { activityEntries, activityTotals, rankedValue, skillTotals } from "../model.js";
+import { activityTotals, levelUpCandidates, skillTotals, teamEntryTotals } from "../model.js";
 import { gains, historyDepth } from "../history.js";
 
 const SIDE_LIMIT = 15;
@@ -80,6 +79,10 @@ export function renderTeamView(state, bucket, roster) {
   return { className: "mainFill", children: [section] };
 }
 
+function members(rows) {
+  return rows.map(function (row) { return { name: row.name, data: row.raw }; });
+}
+
 function buildRows(roster, byName, metric) {
   return roster.map(function (member) {
     const result = byName.get(member.name);
@@ -95,6 +98,8 @@ function buildRows(roster, byName, metric) {
       today: data ? gains(member.name, data, 0) : null,
       week: data ? gains(member.name, data, 7) : null,
       depth: historyDepth(member.name),
+      // Every skill at 99, or every skill at 200M, marks the whole row.
+      tier: data ? playerTier(data.skills) : null,
       raw: data
     };
   }).sort(function (a, b) {
@@ -115,19 +120,24 @@ function standings(rows, metric) {
 
   const max = Math.max(1, ...rows.map(metric.primary));
 
+  // The max treatments belong to the Skills standings; on the boss and
+  // activity boards a gold row would read as a boss or clue achievement.
+  const showTier = metric === METRICS.skills;
+
   rows.forEach(function (row, i) {
-    const node = el("div", "teamRow");
+    const tier = showTier ? row.tier : null;
+    const node = applyTier(el("div", "teamRow"), tier, i);
 
     node.appendChild(el("div", "teamRank", "#" + (i + 1)));
-    node.appendChild(el("div", "teamName", row.name));
+    node.appendChild(el("div", "teamName mx-num" + (tier === "200" ? " prism" : ""), row.name));
 
-    const bar = el("div", "teamBar");
+    const bar = el("div", "teamBar mx-bar");
     const fill = el("div", "teamBarFill");
     fill.style.width = (metric.primary(row) / max) * 100 + "%";
     bar.appendChild(fill);
     node.appendChild(bar);
 
-    node.appendChild(el("div", "teamCell teamLevel",
+    node.appendChild(el("div", "teamCell teamLevel mx-num",
       row.ok ? metric.formatPrimary(metric.primary(row)) : "—"));
     node.appendChild(el("div", "teamCell teamXp",
       row.ok ? metric.formatSecondary(metric.secondary(row)) : "—"));
@@ -206,45 +216,10 @@ function sideRow(item) {
   return row;
 }
 
-// Across every member and every skill, the level-ups with the least XP left.
-// The most glanceable thing an ambient panel can show: what is about to pop.
+// Across every member and every skill, the level-ups closest to popping.
+// The most glanceable thing an ambient panel can show.
 function upcomingLevels(rows) {
-  const candidates = [];
-  const skillNames = GIM_SKILL_ORDER.flat();
-
-  rows.forEach(function (row) {
-    if (!row.ok) return;
-    const byName = new Map(row.raw.skills.map(function (s) { return [s.name, s]; }));
-
-    skillNames.forEach(function (skillName) {
-      const s = byName.get(skillName);
-      const level = Math.max(1, rankedValue(s && s.level) || 1);
-      const xp = rankedValue(s && s.xp);
-
-      // A 99 has no next level, and an unstarted skill is not about to do
-      // anything.
-      if (level >= MAX_SKILL_LEVEL || level >= MAX_VIRTUAL_LEVEL) return;
-      if (xp <= 0) return;
-
-      candidates.push({
-        player: row.name,
-        skill: skillName,
-        level: level,
-        remaining: Math.max(0, xpForLevel(level + 1) - xp),
-        pct: levelProgress(level, xp).pct
-      });
-    });
-  });
-
-  candidates.sort(function (a, b) {
-    if (a.remaining !== b.remaining) return a.remaining - b.remaining;
-    // Equal XP left: further through the level first, then stable by name so
-    // the board does not reshuffle between polls.
-    if (b.pct !== a.pct) return b.pct - a.pct;
-    return a.player.localeCompare(b.player) || a.skill.localeCompare(b.skill);
-  });
-
-  return candidates.slice(0, SIDE_LIMIT).map(function (c) {
+  return levelUpCandidates(members(rows)).slice(0, SIDE_LIMIT).map(function (c) {
     return {
       iconUrl: iconForSkill(c.skill),
       iconAlt: c.skill,
@@ -259,26 +234,7 @@ function upcomingLevels(rows) {
 
 // Team-wide totals per boss or per activity, biggest first, with whoever leads.
 function topEntries(rows, kind) {
-  const totals = new Map();
-
-  rows.forEach(function (row) {
-    if (!row.ok) return;
-    activityEntries(row.raw, kind).forEach(function (entry) {
-      const acc = totals.get(entry.name) || { name: entry.name, total: 0, best: 0, leader: null };
-      acc.total += entry.score;
-      if (entry.score > acc.best) {
-        acc.best = entry.score;
-        acc.leader = row.name;
-      }
-      totals.set(entry.name, acc);
-    });
-  });
-
-  const list = [...totals.values()].sort(function (a, b) {
-    if (b.total !== a.total) return b.total - a.total;
-    return a.name.localeCompare(b.name);
-  });
-
+  const list = teamEntryTotals(members(rows), kind);
   if (list.length === 0) return [];
   const max = list[0].total || 1;
 
