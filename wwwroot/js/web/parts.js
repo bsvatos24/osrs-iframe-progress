@@ -44,6 +44,18 @@ export function card(title, blurb, ...body) {
   return section;
 }
 
+// A card with a control (a toggle) on the right of its heading.
+export function toolCard(title, blurb, tool, ...body) {
+  const section = card(title, blurb, ...body);
+  const head = section.querySelector(".card-head");
+  head.classList.add("tools");
+  // Title and blurb stack on the left so the control lines up with both.
+  const text = el("div");
+  text.append(...head.childNodes);
+  head.append(text, tool);
+  return section;
+}
+
 // [{ label, value, note? }]
 export function stats(items) {
   const strip = el("div", "stats");

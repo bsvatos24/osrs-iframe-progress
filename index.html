@@ -8,14 +8,24 @@
 
   <!-- Decide kiosk or web once, before any stylesheet loads, so each mode gets
        only its own CSS and never flashes the other's. ?mode= wins; otherwise
-       being inside an iframe means the XENEON EDGE. app.js reads data-mode. -->
+       being inside an iframe means the XENEON EDGE. app.js reads data-mode.
+
+       It also loads the app itself, stamped with ?v= (see below). -->
   <script>
     (function () {
-      var asked = new URLSearchParams(location.search).get("mode");
+      var params = new URLSearchParams(location.search);
+      var asked = params.get("mode");
       var mode = asked === "kiosk" || asked === "web" ? asked
         : (window.self !== window.top ? "kiosk" : "web");
       var root = document.documentElement;
       root.dataset.mode = mode;
+
+      // ?v= cache-busts every file the page loads, not just this HTML. iCUE
+      // keeps the widget's scripts cached across a redeploy, and bumping v
+      // only changed index.html's own URL, so the Edge ran new HTML with old
+      // JavaScript. Without ?v= (the web app) the URLs stay plain.
+      var v = (params.get("v") || "").replace(/[^\w.-]/g, "").slice(0, 32);
+      var stamp = v ? "?v=" + v : "";
 
       var sheets = mode === "kiosk"
         ? ["tokens", "base", "components", "views", "layout", "treatments"]
@@ -23,7 +33,7 @@
       sheets.forEach(function (name) {
         var link = document.createElement("link");
         link.rel = "stylesheet";
-        link.href = "wwwroot/css/" + name + ".css";
+        link.href = "wwwroot/css/" + name + ".css" + stamp;
         // Script-inserted stylesheets do not block rendering by default.
         link.setAttribute("blocking", "render");
         document.head.appendChild(link);
@@ -50,6 +60,34 @@
           + "&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap";
         document.head.appendChild(fonts);
       }
+
+      // The stamp only reaches modules imported by other modules through an
+      // import map, which has to exist before the first module loads - so
+      // the entry script is added here too, after it. Every module under
+      // wwwroot/js belongs in this list; one missing still loads, just
+      // without the stamp.
+      if (stamp) {
+        var modules = [
+          "app", "kiosk", "web", "api", "components", "config", "constants", "dom",
+          "format", "gains", "hiscore-data", "history", "mode", "model", "osrs", "store",
+          "wom", "views/gim", "views/item", "views/team", "views/total",
+          "web/compare", "web/overview", "web/parts", "web/player", "web/training"
+        ];
+        var imports = {};
+        modules.forEach(function (name) {
+          var path = "./wwwroot/js/" + name + ".js";
+          imports[path] = path + stamp;
+        });
+        var map = document.createElement("script");
+        map.type = "importmap";
+        map.textContent = JSON.stringify({ imports: imports });
+        document.head.appendChild(map);
+      }
+
+      var entry = document.createElement("script");
+      entry.type = "module";
+      entry.src = "wwwroot/js/app.js" + stamp;
+      document.head.appendChild(entry);
     })();
   </script>
 
@@ -60,9 +98,6 @@
   <meta property="og:title" content="OSRS Progress Dashboard" />
   <meta property="og:description" content="Live skill, boss and team-total tracking for our group ironman." />
   <link rel="icon" href="wwwroot/icons/skills/total.png" />
-
-  <!-- Module scripts are deferred, so this runs after the document parses. -->
-  <script type="module" src="wwwroot/js/app.js"></script>
 </head>
 <body>
   <div id="app"></div>
