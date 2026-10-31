@@ -89,3 +89,10 @@ export function playerTier(skills) {
   if (real.every(function (s) { return s.level >= MAX_SKILL_LEVEL; })) return "max";
   return null;
 }
+
+// The level a given XP total reaches, capped at 99 like the hiscores.
+export function levelForXp(xp) {
+  let level = 1;
+  while (level < MAX_SKILL_LEVEL && xp >= XP_TABLE[level + 1]) level++;
+  return level;
+}

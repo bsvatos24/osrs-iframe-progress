@@ -8,6 +8,7 @@ import { formatCompact, iconForActivity, iconForSkill } from "../format.js";
 import { activityTotals, levelUpCandidates, rankedValue, skillTotals, teamEntryTotals } from "../model.js";
 import { gains } from "../history.js";
 import { card, link, list, meter, pageHead, playerHref, stats } from "./parts.js";
+import { totalGain, trainingCard } from "./training.js";
 
 const LIST_LIMIT = 8;
 const LIST_MAX = 30;
@@ -17,11 +18,12 @@ export function overviewPage(members) {
   const page = document.createDocumentFragment();
 
   page.appendChild(pageHead("Overview",
-    "Where the group stands, who gained today, and what is about to level."));
+    "Where the group stands, what everyone is training, and what is about to level."));
   page.appendChild(groupStats(rows));
 
-  page.appendChild(card("Standings", "Gains are measured from each day's first refresh in this browser.",
+  page.appendChild(card("Standings", "Today and 7 days are XP gained, from Wise Old Man's history.",
     standings(rows)));
+  page.appendChild(trainingCard(members));
 
   const cols = el("div", "cols");
   cols.appendChild(card("About to level", "Furthest through their level, across everyone",
@@ -46,8 +48,10 @@ function standingsRows(members) {
       capped: skills.filter(function (s) { return rankedValue(s.xp) >= MAX_SKILL_XP; }).length,
       bossKc: activityTotals(m.data).bossKc,
       tier: playerTier(m.data.skills),
-      today: gains(m.name, m.data, 0),
-      week: gains(m.name, m.data, 7)
+      // Wise Old Man's shared history first; this browser's own snapshots
+      // only for a player it has nothing on yet.
+      today: totalGain(m, "today") || gains(m.name, m.data, 0),
+      week: totalGain(m, "week") || gains(m.name, m.data, 7)
     };
   });
 

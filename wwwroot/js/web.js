@@ -1,18 +1,22 @@
 // ============================================================
 // Web app: the dashboard as a web page for the group, not the Edge widget.
 //
-// Three pages behind hash routes, so any of them can be bookmarked or sent:
-//   #overview                 standings, gains, about to level, most killed
+// Four pages behind hash routes, so any of them can be bookmarked or sent:
+//   #overview                 standings, training, about to level, most killed
 //   #player-<name>            one member in full
-//   #compare / #compare-bosses / #compare-activities  everyone side by side
+//   #compare / #compare-bosses / #compare-activities / #compare-gains
+//                             everyone side by side
+//   #activity                 level-ups and big XP days
 //
-// Every page renders from one multi-player fetch, so moving between them
-// costs no requests. The kiosk (kiosk.js) shares the data layer and the 99 /
-// 200M treatments with this file and nothing else.
+// Every page renders from one multi-player hiscores fetch plus each player's
+// Wise Old Man history, so moving between them costs no requests. The kiosk
+// (kiosk.js) shares the data layer and the 99 / 200M treatments with this
+// file and nothing else.
 // ============================================================
 
 import { applyConfigToDocument, config } from "./config.js";
 import { loadPlayers } from "./api.js";
+import { loadHistories } from "./wom.js";
 import { snapshot } from "./history.js";
 import { el, img } from "./dom.js";
 import { refreshIcon } from "./components.js";
@@ -20,20 +24,30 @@ import { formatClock } from "./format.js";
 import { overviewPage } from "./web/overview.js";
 import { playerPage } from "./web/player.js";
 import { comparePage } from "./web/compare.js";
+import { activityPage, onSettingChange } from "./web/training.js";
 import { link, notice, playerSlug } from "./web/parts.js";
 
 const APP_NAME = "Group Ironman";
 const CLOCK_TICK_MS = 30 * 1000;
+// Wise Old Man allows 20 requests a minute per IP, and a load costs up to two
+// per player, so history is fetched at most this often however many times
+// Refresh is pressed.
+const HISTORY_MIN_MS = 5 * 60 * 1000;
 
 const NAV = [
   { id: "overview", label: "Overview", href: "#overview" },
   { id: "player", label: "Players", href: null },
-  { id: "compare", label: "Compare", href: "#compare" }
+  { id: "compare", label: "Compare", href: "#compare" },
+  { id: "activity", label: "Activity", href: "#activity" }
 ];
 
 const state = {
-  // Roster order, one entry per player: { name, data, result }.
-  members: config.players.map(function (name) { return { name: name, data: null, result: null }; }),
+  // Roster order, one entry per player: { name, data, result, history }.
+  // history stays undefined until Wise Old Man answers.
+  members: config.players.map(function (name) {
+    return { name: name, data: null, result: null, history: undefined };
+  }),
+  historyAt: 0,
   loading: true,
   refreshing: false,
   loadedAt: null,
@@ -44,6 +58,7 @@ const state = {
 
 const ui = {};
 let inflight = null;
+let historyInflight = null;
 let pollTimer = null;
 
 export function start() {
@@ -61,6 +76,7 @@ export function start() {
   });
   document.addEventListener("visibilitychange", onVisibility);
   setInterval(updateStatus, CLOCK_TICK_MS);
+  onSettingChange(render);
 
   render();
   load();
@@ -124,7 +140,9 @@ function parseRoute() {
   }
   if (hash === "compare-bosses") return { page: "compare", mode: "bosses" };
   if (hash === "compare-activities") return { page: "compare", mode: "activities" };
+  if (hash === "compare-gains") return { page: "compare", mode: "gains" };
   if (hash === "compare") return { page: "compare", mode: "skills" };
+  if (hash === "activity") return { page: "activity" };
   return { page: "overview" };
 }
 
@@ -140,7 +158,8 @@ function render() {
   if (route.page === "player") ui.nav.player.href = "#player-" + playerSlug(route.member.name);
 
   const title = route.page === "player" ? route.member.name
-    : route.page === "compare" ? "Compare" : "Overview";
+    : route.page === "compare" ? "Compare"
+    : route.page === "activity" ? "Activity" : "Overview";
   document.title = title + " \u00B7 " + APP_NAME;
 
   updateStatus();
@@ -160,6 +179,7 @@ function render() {
 
   if (route.page === "player") parts.push(playerPage(state.members, route.member));
   else if (route.page === "compare") parts.push(comparePage(state.members, route.mode));
+  else if (route.page === "activity") parts.push(activityPage(state.members));
   else parts.push(overviewPage(state.members));
 
   ui.view.replaceChildren(...parts);
@@ -255,6 +275,36 @@ function load() {
       state.loading = false;
       state.refreshing = false;
       render();
+    });
+
+  if (Date.now() - state.historyAt >= HISTORY_MIN_MS) loadHistory();
+}
+
+// Wise Old Man history, alongside the hiscores rather than before them: the
+// pages render as soon as the hiscores land, and the gains fill in after.
+function loadHistory() {
+  if (historyInflight) historyInflight.abort();
+  const controller = new AbortController();
+  historyInflight = controller;
+  state.historyAt = Date.now();
+
+  loadHistories(config.players, controller.signal)
+    .then(function (results) {
+      if (historyInflight !== controller) return;
+      results.forEach(function (h, i) {
+        const member = state.members[i];
+        // A failed refresh keeps history that loaded earlier.
+        if (h.status === "error" && member.history && member.history.status === "ok") return;
+        member.history = h;
+      });
+      render();
+    })
+    .catch(function (err) {
+      if (err && err.name === "AbortError") return;
+      console.error("[web] history load failed", err);
+    })
+    .finally(function () {
+      if (historyInflight === controller) historyInflight = null;
     });
 }
 

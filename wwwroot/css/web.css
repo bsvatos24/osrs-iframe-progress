@@ -23,6 +23,8 @@
   --warn-text:#6b4a00;
   --bad:#b4232a;
   --track:#e6e1ec;
+  --heat:176 42 166;      /* Compare Gains shading, as RGB channels */
+  --good-soft:rgba(22,131,74,.10);
   --shadow-sm:0 1px 2px rgba(27,23,32,.12);
 
   /* 99 / 200M (treatments.css) */
@@ -58,6 +60,8 @@
     --warn-text:#f3d68f;
     --bad:#ff7a7f;
     --track:#2a2631;
+    --heat:239 80 231;
+    --good-soft:rgba(74,222,128,.12);
     --shadow-sm:0 1px 2px rgba(0,0,0,.5);
 
     --gold:#e8b53a;
@@ -156,6 +160,9 @@ main{ padding-block:28px 64px; }
 .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; min-width:0; }
 .card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:4px 12px; margin-bottom:12px; flex-wrap:wrap; }
 .card-head p{ font-size:13px; color:var(--muted); }
+.card-head.tools{ align-items:center; }
+.credit{ display:inline-block; margin-top:12px; font-size:12.5px; color:var(--muted); }
+.credit:hover{ color:var(--text); }
 .cols{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:18px; align-items:start; }
 .stack{ display:flex; flex-direction:column; gap:18px; min-width:0; }
 .empty{ color:var(--muted); font-size:14px; padding:6px 0; }
@@ -255,7 +262,14 @@ main{ padding-block:28px 64px; }
   background:var(--surface);
 }
 .sk .ico{ grid-row:1 / span 2; width:26px; height:26px; }
-.sk .nm{ font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sk .nm{ display:flex; align-items:center; gap:8px; min-width:0; font-weight:600; font-size:14px; }
+.sk .nm-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pill{
+  flex:none; padding:1px 7px; border-radius:999px;
+  background:var(--good-soft); color:var(--good);
+  font-size:11.5px; font-weight:700; white-space:nowrap;
+}
+.sk.idle{ opacity:.45; }
 .sk .lv{ font-family:var(--f-display); font-weight:700; font-size:20px; line-height:1; text-align:right; }
 .sk .bottom{ grid-column:2 / span 2; display:flex; align-items:center; gap:10px; min-width:0; }
 .sk .bar{ flex:1; height:6px; border-radius:999px; background:var(--track); overflow:hidden; min-width:40px; }
@@ -273,6 +287,12 @@ main{ padding-block:28px 64px; }
 .seg{ display:flex; gap:4px; background:var(--surface-2); padding:4px; border-radius:10px; width:max-content; max-width:100%; }
 .seg a{ text-decoration:none; padding:7px 14px; border-radius:7px; font-weight:600; font-size:13.5px; color:var(--muted); }
 .seg a[aria-current="page"]{ background:var(--surface); color:var(--text); box-shadow:var(--shadow-sm); }
+.seg button{
+  border:0; background:none; cursor:pointer;
+  padding:6px 12px; border-radius:7px; font-weight:600; font-size:13px; color:var(--muted);
+}
+.seg button[aria-pressed="true"]{ background:var(--surface); color:var(--text); box-shadow:var(--shadow-sm); }
+.seg a:hover, .seg button:hover{ color:var(--text); }
 .tablewrap{ overflow-x:auto; }
 /* Fixed layout so every player's column is the same width. */
 .matrix{ border-collapse:separate; border-spacing:4px; width:100%; min-width:680px; table-layout:fixed; }
@@ -304,19 +324,76 @@ main{ padding-block:28px 64px; }
   content:"\25B2"; position:absolute; top:3px; right:5px; z-index:1;
   font-size:8px; color:var(--accent);
 }
+.lvcell.heat:not(.dimnum){ background:rgb(var(--heat) / var(--heat-a, .2)); }
 .matrix tfoot td{ font-family:var(--f-display); font-weight:700; text-align:center; padding:10px 4px 0; }
+
+/* ---------- Training (Overview) ---------- */
+.train{ display:flex; flex-direction:column; }
+.tr-row{
+  display:grid; grid-template-columns:minmax(120px, 170px) 84px minmax(0, 1fr);
+  gap:6px 16px; align-items:center; padding:12px 0; border-top:1px solid var(--line);
+}
+.tr-row:first-child{ border-top:0; }
+.tr-who{ display:flex; flex-direction:column; min-width:0; }
+.tr-name{ font-weight:600; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tr-name:hover{ text-decoration:underline; }
+.tr-since{ font-size:12px; color:var(--muted); }
+.tr-total{ text-align:right; font-family:var(--f-display); font-weight:600; font-size:16px; }
+.tr-skills{ display:flex; flex-wrap:wrap; gap:6px; min-width:0; }
+.tr-empty{ color:var(--muted); font-size:14px; }
+.gchip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 10px 4px 6px; border-radius:999px;
+  background:var(--surface-2); font-size:13px; white-space:nowrap;
+}
+.gchip .ico{ width:18px; height:18px; }
+.gchip b{ font-weight:600; }
+.more-chip{ padding-left:10px; color:var(--muted); text-decoration:none; }
+.more-chip:hover{ color:var(--text); }
+
+/* ---------- Gaining XP (Players) ---------- */
+.gp{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:24px; align-items:start; }
+.days{ display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px; height:150px; padding-top:8px; }
+.day{ display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:6px; min-width:0; }
+.day .col{ width:100%; max-width:34px; border-radius:6px 6px 2px 2px; background:var(--accent); }
+.day .col.zero{ background:var(--track); }
+.day .v, .day .d{ font-size:11.5px; color:var(--muted); white-space:nowrap; }
+.day .d{ font-weight:600; }
+.day.today .d{ color:var(--text); }
+
+/* ---------- Activity ---------- */
+.feed{ display:flex; flex-direction:column; gap:20px; }
+.feed-day{ display:flex; flex-direction:column; }
+.feed-day > .label{ font-family:var(--f-body); margin-bottom:4px; }
+.ev{
+  display:grid; grid-template-columns:24px minmax(0, 1fr) auto;
+  gap:12px; align-items:center; padding:8px 0; border-top:1px solid var(--line);
+}
+.feed-day > .label + .ev{ border-top:0; }
+.ev .what{ font-size:14px; min-width:0; }
+.ev-who{ font-weight:600; text-decoration:none; }
+.ev-who:hover{ text-decoration:underline; }
+.ev .when{ font-size:12.5px; color:var(--muted); white-space:nowrap; }
+.badge{
+  display:inline-block; margin-left:8px; padding:1px 7px; border-radius:999px;
+  background:var(--accent-soft); color:var(--accent);
+  font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; vertical-align:1px;
+}
+.badge-99{ background:var(--gold-fill); color:var(--gold-ink); border:1px solid var(--gold); }
+.badge-200{ background-color:transparent; border:1px solid var(--p4); }
 .matrix tfoot .rowhead{ font-family:var(--f-body); }
 
 /* ---------- Narrow ---------- */
 @media (max-width:980px){
   .skills{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  .cols{ grid-template-columns:1fr; }
+  .cols, .gp{ grid-template-columns:1fr; }
   .stats{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .st-row{ grid-template-columns:32px minmax(0, 1fr) minmax(60px, 1fr) 72px 64px 64px 64px; gap:10px; }
 }
 @media (max-width:640px){
-  .appbar .wrap{ gap:12px; }
-  .nav a{ padding:0 8px; }
+  .appbar .wrap{ gap:8px; }
+  .nav{ gap:0; }
+  .nav a{ padding:0 7px; font-size:13px; }
   .updated .when{ display:none; }
   .brand span{ display:none; }
   h1{ font-size:24px; }
@@ -330,6 +407,9 @@ main{ padding-block:28px 64px; }
   .st-row .st-meter, .st-row .st-xp{ display:none; }
   .stat{ padding:12px 14px; }
   .stat b{ font-size:20px; }
+  /* Name and total share a line; the skill chips wrap below. */
+  .tr-row{ grid-template-columns:minmax(0, 1fr) auto; }
+  .tr-skills{ grid-column:1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce){

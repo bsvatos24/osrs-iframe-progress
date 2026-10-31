@@ -1,5 +1,5 @@
 // ============================================================
-// Compare: everyone side by side, by skill, boss or activity.
+// Compare: everyone side by side, by skill, boss, activity or XP gained.
 // ============================================================
 
 import { applyTier, el } from "../dom.js";
@@ -8,16 +8,22 @@ import { maxTier } from "../osrs.js";
 import { iconForActivity, iconForSkill } from "../format.js";
 import { activityTotals, compareNames, hasSkillLevel, rankedValue, skillTotals } from "../model.js";
 import { card, icon, link, pageHead, playerHref } from "./parts.js";
+import { compareGains } from "./training.js";
 
 const BLURBS = {
   skills: "Everyone side by side. \u25B2 marks the most XP in each row; hover a level for its XP.",
   bosses: "Everyone side by side, A to Z. \u25B2 marks the most kills in each row.",
-  activities: "Minigames, clue scrolls and the rest of the hiscores. \u25B2 marks the highest in each row."
+  activities: "Minigames, clue scrolls and the rest of the hiscores. \u25B2 marks the highest in each row.",
+  gains: "Who is training what: XP gained in each skill, side by side."
 };
 
 export function comparePage(members, mode) {
   const page = document.createDocumentFragment();
   page.appendChild(pageHead("Compare", BLURBS[mode], segment(mode)));
+  if (mode === "gains") {
+    page.appendChild(compareGains(members));
+    return page;
+  }
 
   const table = el("table", "matrix");
   table.appendChild(headRow(members));
@@ -47,7 +53,8 @@ function segment(mode) {
   [
     ["skills", "#compare", "Skills"],
     ["bosses", "#compare-bosses", "Bosses"],
-    ["activities", "#compare-activities", "Activities"]
+    ["activities", "#compare-activities", "Activities"],
+    ["gains", "#compare-gains", "Gains"]
   ].forEach(function (opt) {
     const a = link(opt[1], null, opt[2]);
     if (opt[0] === mode) a.setAttribute("aria-current", "page");

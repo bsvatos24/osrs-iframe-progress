@@ -23,6 +23,21 @@ it, the grid button opens a searchable picker, and the player dropdown switches
 accounts. In web mode cycling is off by default so the view does not move while
 you are reading it.
 
+## Web pages
+
+The browser version has its own layout (`web.js`), with hash routes so any page
+can be bookmarked or sent:
+
+| Route | Shows |
+|---|---|
+| `#overview` | Group totals, standings with XP gained today and over 7 days, **Training** (each player's XP gained and the skills it went into), About to level, Most killed |
+| `#player-<name>` | One member: **Gaining XP** (XP per day for the last week, and every skill gained in with levels gained), skills with this week's gain on each tile, bosses, clues, activities |
+| `#compare`, `#compare-bosses`, `#compare-activities` | Everyone side by side |
+| `#compare-gains` | XP gained per skill per player, shaded by amount |
+| `#activity` | Level-ups, 200M, and days with 25k+ XP in a skill, grouped by day, for the last week |
+
+The gains views share one Today / 7 days switch, remembered per browser.
+
 ## Running locally
 
 The app uses ES modules, so it needs to be served over HTTP — opening
@@ -105,6 +120,14 @@ options, and emits the snippet to paste into the iCUE **IFRAME** widget:
 `embed.html` is also the way to check all three slot layouts without swapping
 the live widget.
 
+### Updating the widget after a deploy
+
+iCUE keeps the widget's files cached across a deploy. Bump `v=` in the iframe
+URL (`v=3` to `v=4`) and every file the page loads is fetched fresh: `index.html`
+stamps `?v=` on each stylesheet and, through an import map, on every module.
+A new module has to be added to the list in `index.html` to get the stamp; one
+left out still loads, just without it.
+
 ### Example slot setups
 
 ```
@@ -123,9 +146,33 @@ Keyboard: arrow keys to change item, `R` to refresh, `P` to pin.
 ## Progress history
 
 The hiscores are point-in-time only: they say what you have, never what you
-gained. The app stores one snapshot per player per day in `localStorage` and
-diffs against it, which is what powers the Team view's "today" and "7 days"
-columns.
+gained. Two sources fill that gap.
+
+### Wise Old Man (web)
+
+The web pages' gains come from [Wise Old Man](https://wiseoldman.net), which
+stores a snapshot of a player every time they are updated, on its servers, so
+everyone sees the same history on every device. `wom.js` fetches 14 days of
+snapshots per player; `gains.js` measures from the snapshot at the start of the
+window to the **live** hiscores read the page just made, so gains are current
+even when Wise Old Man was last updated hours ago.
+
+Wise Old Man only records a player when asked. The page asks: a player it has
+never seen is tracked, and one whose newest snapshot is over 30 minutes old is
+updated, both in the background. Its limits without an API key are 20
+requests a minute and 500 an hour per IP, and one update per player per minute;
+a load costs at most two requests per player and history is refetched at most
+every 5 minutes however often Refresh is pressed.
+
+Activity times are when a change was first seen, which can be later than when
+it happened. A skill that is unranked at either end of a window is left out
+rather than counted from zero.
+
+### Browser snapshots (kiosk, and web fallback)
+
+The app also stores one snapshot per player per day in `localStorage` and
+diffs against it. That powers the kiosk Team view's "today" and "7 days"
+columns, and the web Standings for a player Wise Old Man has nothing on.
 
 The **first** observation of each day is kept and never overwritten - that is
 what makes "gained today" mean anything; overwriting on each poll would leave
@@ -133,11 +180,8 @@ the delta permanently at zero. Only fresh reads anchor a day, so a cached
 payload cannot backdate one. History is per-browser, so it starts from the day
 that browser first opened the page and a teammate's phone has its own.
 
-This sits behind a deliberately narrow interface (`snapshot` / `gains` in
-`history.js`) so it can be replaced by [Wise Old Man](https://docs.wiseoldman.net/)'s
-server-side group history - shared across everyone, with records and
-competitions - without touching the views. That would be the natural next step,
-proxied through the existing Worker with the API key server-side.
+The kiosk could move to Wise Old Man the same way; it has not yet, so the
+Edge makes no extra requests.
 
 ## Data source
 
@@ -150,7 +194,7 @@ cached numbers with an "as of HH:MM" stamp rather than showing nothing.
 ## Code layout
 
 ```
-index.html              entry point; no external dependencies
+index.html              entry point; picks kiosk or web, stamps ?v= on every file
 embed.html              slot-size preview and iCUE snippet builder
 wwwroot/css/
   tokens.css            palette and radii; the accent lives here only
@@ -158,6 +202,8 @@ wwwroot/css/
   components.css        cards, gauges, buttons, tabs, picker, player menu
   views.css             milestone bar, Total grid, GIM panels
   layout.css            dual mode: [data-mode] and [data-bucket] rules
+  web.css               the web app's pages, light and dark
+  treatments.css        99 / 200M styling, shared by both apps
 wwwroot/js/
   config.js             query-string options
   mode.js               layout bucket resolution (one ResizeObserver)
@@ -166,12 +212,17 @@ wwwroot/js/
   format.js             number/rank/clock formatting, icon paths, colour ramp
   model.js              hiscores payload -> uniform display items
   history.js            daily localStorage snapshots -> XP gained
+  wom.js                Wise Old Man history: fetch, track and update players
+  gains.js              XP gained per skill, per day, and activity events
   api.js                fetch with timeout, retry and cache
   store.js              state plus batched, region-scoped render scheduling
   dom.js                small element helpers
   components.js         reusable UI pieces
-  views/                item.js, total.js, gim.js, team.js
-  app.js                shell, wiring and timers
+  views/                kiosk views: item.js, total.js, gim.js, team.js
+  app.js                loads kiosk.js or web.js
+  kiosk.js              kiosk shell, wiring and timers
+  web.js                web shell: routes, polling, history loading
+  web/                  web pages: overview, player, compare, training (gains), parts
 wwwroot/icons/          skill and activity icons (PNG, named by slug)
 ```
 

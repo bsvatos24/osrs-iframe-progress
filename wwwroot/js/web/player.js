@@ -1,5 +1,6 @@
 // ============================================================
-// Players: one member in full - every skill, bosses, clues and activities.
+// Players: one member in full - XP gains, every skill, bosses, clues and
+// activities.
 // ============================================================
 
 import { applyTier, el } from "../dom.js";
@@ -11,7 +12,8 @@ import {
 import { formatCompact, formatRank, iconForActivity, iconForSkill } from "../format.js";
 import { activityTotals, hasSkillLevel, isRanked, rankedValue, skillTotals } from "../model.js";
 import { gains } from "../history.js";
-import { card, icon, link, list, notice, pageHead, playerHref, stats } from "./parts.js";
+import { card, icon, link, list, notice, pageHead, playerHref, stats, toolCard } from "./parts.js";
+import { gainingCard, isOnlyTraining, trainingToggle, weeklyGains } from "./training.js";
 
 const LIST_LIMIT = 8;
 const CLUE_TIERS = ["beginner", "easy", "medium", "hard", "elite", "master"];
@@ -34,7 +36,15 @@ export function playerPage(members, member) {
 
   const skills = member.data.skills.filter(function (s) { return s.name !== "Overall"; });
   page.appendChild(playerStats(member, skills));
-  page.appendChild(card("Skills", "In the order of the game's skills tab", skillGrid(skills)));
+  page.appendChild(gainingCard(member));
+
+  // Tiles carry this week's gain; the toggle fades the ones without any.
+  // Without history there is nothing to highlight, so no toggle either.
+  const weekly = weeklyGains(member);
+  const grid = skillGrid(skills, weekly, weekly && isOnlyTraining());
+  page.appendChild(weekly
+    ? toolCard("Skills", "In the order of the game's skills tab", trainingToggle(), grid)
+    : card("Skills", "In the order of the game's skills tab", grid));
 
   const cols = el("div", "cols");
   cols.appendChild(card("Bosses", "Most killed first",
@@ -79,7 +89,7 @@ function playerStats(member, skills) {
   ]);
 }
 
-function skillGrid(skills) {
+function skillGrid(skills, weekly, dimIdle) {
   const byName = new Map(skills.map(function (s) { return [s.name, s]; }));
   // The curated order first; anything the game adds later still shows, last.
   const ordered = SKILL_GRID_ORDER.filter(function (n) { return byName.has(n); })
@@ -87,11 +97,16 @@ function skillGrid(skills) {
       .filter(function (n) { return !SKILL_GRID_ORDER.includes(n); }));
 
   const grid = el("div", "skills");
-  ordered.forEach(function (name, i) { grid.appendChild(skillTile(byName.get(name), i)); });
+  ordered.forEach(function (name, i) {
+    const gained = weekly ? weekly.get(name) || 0 : 0;
+    const tile = skillTile(byName.get(name), i, gained);
+    if (dimIdle && !gained) tile.classList.add("idle");
+    grid.appendChild(tile);
+  });
   return grid;
 }
 
-function skillTile(s, i) {
+function skillTile(s, i, gained) {
   const listed = hasSkillLevel(s);
   const level = Math.max(1, rankedValue(s.level) || 1);
   const xp = rankedValue(s.xp);
@@ -100,7 +115,14 @@ function skillTile(s, i) {
   const tile = applyTier(el("div", "sk"), tier, i);
   tile.title = listed ? s.name + ": " + xp.toLocaleString() + " XP" : s.name + ": not on the hiscores";
   tile.appendChild(icon(iconForSkill(s.name), s.name));
-  tile.appendChild(el("span", "nm", s.name));
+  const nm = el("span", "nm");
+  nm.appendChild(el("span", "nm-text", s.name));
+  if (gained) {
+    const pill = el("span", "pill", "+" + formatCompact(gained));
+    pill.title = gained.toLocaleString() + " XP in the last 7 days";
+    nm.appendChild(pill);
+  }
+  tile.appendChild(nm);
 
   const lv = el("span", "lv mx-num");
   if (tier === "200") lv.appendChild(el("span", "prism", String(level)));
