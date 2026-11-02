@@ -55,13 +55,9 @@ function standingsRows(members) {
     };
   });
 
-  // Highest total level first; XP breaks ties. Players whose hiscores could
-  // not be read sink to the bottom rather than ranking as zero.
-  return rows.sort(function (a, b) {
-    if (a.ok !== b.ok) return a.ok ? -1 : 1;
-    if (!a.ok) return a.name.localeCompare(b.name);
-    return (b.totals.level - a.totals.level) || (b.totals.xp - a.totals.xp);
-  });
+  // Already in standings order: web.js ranks members by total level, then
+  // XP, with unreadable hiscores last, once for every page.
+  return rows;
 }
 
 function groupStats(rows) {

@@ -148,10 +148,8 @@ export function trainingCard(members) {
     const g = blocked ? null : memberGains(m, period);
     return { member: m, blocked: blocked, gains: g };
   });
-  // Most XP first; players with nothing to show keep roster order below.
-  rows.sort(function (a, b) {
-    return (b.gains ? b.gains.total : -1) - (a.gains ? a.gains.total : -1);
-  });
+  // Rows keep the standings order (members arrive ranked by total level,
+  // then XP), like every other list of players on the site.
 
   const list = el("div", "train");
   rows.forEach(function (row) { list.appendChild(trainingRow(row)); });
