@@ -26,6 +26,7 @@ import { playerPage } from "./web/player.js";
 import { comparePage } from "./web/compare.js";
 import { activityPage, onSettingChange } from "./web/training.js";
 import { link, notice, playerSlug } from "./web/parts.js";
+import { skillTotals } from "./model.js";
 
 const APP_NAME = "Group Ironman";
 const CLOCK_TICK_MS = 30 * 1000;
@@ -48,6 +49,9 @@ const state = {
     return { name: name, data: null, result: null, history: undefined };
   }),
   historyAt: 0,
+  // The player "Players" opens: one named in ?player=, else the last one
+  // viewed, else whoever is ranked first.
+  lastPlayer: new URLSearchParams(location.search).get("player") ? config.player : null,
   loading: true,
   refreshing: false,
   loadedAt: null,
@@ -100,7 +104,7 @@ function buildShell() {
   nav.setAttribute("aria-label", "Pages");
   ui.nav = {};
   NAV.forEach(function (item) {
-    const a = link(item.href || "#player-" + playerSlug(config.player), null, item.label);
+    const a = link(item.href || "#player-" + playerSlug(state.lastPlayer || config.players[0]), null, item.label);
     ui.nav[item.id] = a;
     nav.appendChild(a);
   });
@@ -134,7 +138,7 @@ function parseRoute() {
   if (hash.indexOf("player-") === 0) {
     const slug = hash.slice("player-".length);
     const member = state.members.find(function (m) { return playerSlug(m.name) === slug; })
-      || state.members.find(function (m) { return m.name === config.player; })
+      || state.members.find(function (m) { return m.name === state.lastPlayer; })
       || state.members[0];
     return { page: "player", member: member };
   }
@@ -154,8 +158,10 @@ function render() {
     if (id === route.page) ui.nav[id].setAttribute("aria-current", "page");
     else ui.nav[id].removeAttribute("aria-current");
   });
-  // "Players" returns to whoever was last opened.
-  if (route.page === "player") ui.nav.player.href = "#player-" + playerSlug(route.member.name);
+  // "Players" returns to whoever was last opened, or the top of the
+  // standings - not whoever's roster entry happens to come first.
+  if (route.page === "player") state.lastPlayer = route.member.name;
+  ui.nav.player.href = "#player-" + playerSlug(state.lastPlayer || state.members[0].name);
 
   const title = route.page === "player" ? route.member.name
     : route.page === "compare" ? "Compare"
@@ -242,7 +248,7 @@ function load() {
     .then(function (results) {
       if (inflight !== controller) return;
       results.forEach(function (r, i) {
-        const member = state.members[i];
+        const member = memberNamed(config.players[i]);
         // A failed refresh with nothing cached keeps what this page already
         // showed rather than blanking a player who loaded fine a minute ago.
         if (!r.data && member.data) {
@@ -255,6 +261,8 @@ function load() {
         }
         if (r.data && !r.stale) snapshot(member.name, r.data);
       });
+
+      rankMembers();
 
       const fresh = results.filter(function (r) { return r.data && !r.stale; });
       state.savedOnly = fresh.length === 0;
@@ -280,6 +288,28 @@ function load() {
   if (Date.now() - state.historyAt >= HISTORY_MIN_MS) loadHistory();
 }
 
+function memberNamed(name) {
+  return state.members.find(function (m) { return m.name === name; });
+}
+
+// Every page lists players in one order: highest total level first, then
+// most total XP. Anyone whose hiscores could not be read goes last, in roster
+// order. Sorting state.members once means the chips, Compare's columns and
+// every card follow it without each sorting on its own - so no page leads
+// with the roster's first entry just because it is first.
+function rankMembers() {
+  state.members.sort(function (a, b) {
+    if (!!a.data !== !!b.data) return a.data ? -1 : 1;
+    if (a.data && b.data) {
+      const ta = skillTotals(a.data);
+      const tb = skillTotals(b.data);
+      if (tb.level !== ta.level) return tb.level - ta.level;
+      if (tb.xp !== ta.xp) return tb.xp - ta.xp;
+    }
+    return config.players.indexOf(a.name) - config.players.indexOf(b.name);
+  });
+}
+
 // Wise Old Man history, alongside the hiscores rather than before them: the
 // pages render as soon as the hiscores land, and the gains fill in after.
 function loadHistory() {
@@ -292,7 +322,7 @@ function loadHistory() {
     .then(function (results) {
       if (historyInflight !== controller) return;
       results.forEach(function (h, i) {
-        const member = state.members[i];
+        const member = memberNamed(config.players[i]);
         // A failed refresh keeps history that loaded earlier.
         if (h.status === "error" && member.history && member.history.status === "ok") return;
         member.history = h;
