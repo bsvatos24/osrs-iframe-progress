@@ -148,8 +148,13 @@ export function trainingCard(members) {
     const g = blocked ? null : memberGains(m, period);
     return { member: m, blocked: blocked, gains: g };
   });
-  // Rows keep the standings order (members arrive ranked by total level,
-  // then XP), like every other list of players on the site.
+  // The one list not in standings order: this card is a scoreboard for the
+  // day or week, so whoever gained the most XP leads. Ties, and players with
+  // nothing to show, keep the standings order (members arrive ranked by total
+  // level, then XP, and the sort is stable).
+  rows.sort(function (a, b) {
+    return (b.gains ? b.gains.total : -1) - (a.gains ? a.gains.total : -1);
+  });
 
   const list = el("div", "train");
   rows.forEach(function (row) { list.appendChild(trainingRow(row)); });
